@@ -40,31 +40,17 @@ and enforce invariants. A Rails-native background job runner will perform
 reconciliation and other non-critical work; it will not be required to complete
 a transfer.
 
-```text
-<!-- Diagram placeholder: replace with a rendered architecture diagram when available. -->
-                         +------------------+
- Client ---------------->| Rails API        |
-                         | auth, commands,  |
-                         | pagination       |
-                         +--------+---------+
-                                  |
-                                  | database transaction
-                                  v
-                         +------------------+
-                         | PostgreSQL       |
-                         | accounts         |
-                         | transfers        |
-                         | ledger_entries   |
-                         | idempotency      |
-                         | audit_log        |
-                         +--------+---------+
-                                  ^
-                                  | reconciliation reads
-                         +--------+---------+
-                         | Background jobs  |
-                         +------------------+
+### C1: System context
 
-```
+![Payments Ledger system context diagram](C1_SystemContext.svg)
+
+### C2: Container view
+
+![Payments Ledger container diagram](C2_Containers.svg)
+
+The architecture is also maintained as Structurizr DSL in
+[`architecture/workspace.dsl`](architecture/workspace.dsl), including the C1
+system-context and C2 container views.
 
 ## Data model
 
