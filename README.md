@@ -35,12 +35,10 @@ the project is built and measured.
 ## Architecture
 
 The API-only Rails application will validate requests, authenticate API keys,
-and execute transfer commands. PostgreSQL will own transactional state and
-enforce invariants. Background jobs will perform reconciliation and other
-non-critical work; they will not be required to complete a transfer.
-
-Redis is optional. If added, it will provide cache-aside reads for balances only.
-It will never be used as the source of truth or placed in the transfer path.
+and execute money-movement commands. PostgreSQL will own transactional state
+and enforce invariants. A Rails-native background job runner will perform
+reconciliation and other non-critical work; it will not be required to complete
+a transfer.
 
 ```text
 <!-- Diagram placeholder: replace with a rendered architecture diagram when available. -->
@@ -66,8 +64,6 @@ It will never be used as the source of truth or placed in the transfer path.
                          | Background jobs  |
                          +------------------+
 
- Optional: Rails API <----> Redis
-           cache-aside balance reads only
 ```
 
 ## Data model
@@ -83,7 +79,9 @@ entities are:
 - timestamps
 
 `balance_cents` is an integer maintained transactionally with ledger writes. It
-will be checked against the account's ledger total by reconciliation.
+is the read path for balances and will be checked against the account's ledger
+total by reconciliation. The service will not use a cache in the initial
+implementation.
 
 ### `transfers`
 
@@ -108,11 +106,12 @@ basis for idempotent retries.
 - entry type
 - timestamps
 
-Each transfer creates one debit and one credit in the same database transaction.
-Ledger entries are append-only. A reversal creates new entries instead of
-editing historical entries. Append-only behavior will be enforced with a
-database trigger or restricted database permissions, rather than relying only on
-application conventions.
+Each money movement creates one debit and one credit in the same database
+transaction. Deposits will use a system funding account as the balancing side
+instead of creating unbalanced money. Ledger entries are append-only. A reversal
+creates new entries instead of editing historical entries. Append-only behavior
+will be enforced with a database trigger or restricted database permissions,
+rather than relying only on application conventions.
 
 ### `idempotency_keys`
 
@@ -135,7 +134,8 @@ writes to the database.
 ## Proposed API
 
 The following REST surface is the planned contract. It may evolve as the
-implementation and tests clarify the domain model.
+implementation and tests clarify the domain model. Deposits and account-to-
+account transfers will share the same transactional money-movement service.
 
 ### Create an account
 
@@ -178,6 +178,9 @@ Content-Type: application/json
   "balance_cents": 5000
 }
 ```
+
+Internally, this creates a balanced pair of entries between the system funding
+account and the customer account.
 
 ### Read a balance
 
@@ -268,12 +271,13 @@ The unique idempotency-key index is the final protection against duplicate
 operations. Application-level checks alone are insufficient because two
 concurrent requests can both pass a pre-check before either commits.
 
-### Cache outside the transfer path
+### Materialized balances with reconciliation
 
-Redis may improve balance-read latency, but a cache cannot decide whether a
-withdrawal is allowed. Transfers will read and update PostgreSQL directly. Cache
-invalidation or stale reads therefore cannot cause an overdraft or create a
-phantom transfer.
+The service will store `accounts.balance_cents` as a materialized value and
+update it in the same transaction as the ledger entries. This keeps balance
+reads inexpensive while PostgreSQL remains the source of truth. Reconciliation
+will compare the materialized balance with the sum of the account's append-only
+ledger entries and record drift without silently repairing it.
 
 ### Append-only history
 
@@ -308,6 +312,9 @@ The most important tests will run real concurrent requests against PostgreSQL:
 5. Submit concurrent requests using one idempotency key.
 6. Assert that exactly one transfer is created and every successful retry
    returns the same stored result.
+7. Run simultaneous transfers in both directions between the same two accounts.
+8. Assert that the requests do not deadlock, no updates are lost, and every
+   committed transfer remains balanced.
 
 These tests are intended to demonstrate the guarantees that ordinary sequential
 request tests cannot prove.
@@ -319,7 +326,6 @@ Prerequisites:
 - Ruby and Bundler
 - PostgreSQL
 - Node.js only if required by the selected Rails setup
-- Redis only if the optional cache or Sidekiq path is implemented
 
 The planned local workflow is:
 
@@ -360,13 +366,13 @@ environment are stable.
 
 | Scenario | Throughput | p95 latency | Notes |
 | --- | ---: | ---: | --- |
-| Transfer creation | [X] req/s | [Y] ms | PostgreSQL-backed, no cache in write path |
-| Balance reads | [X] req/s | [Y] ms | Record whether Redis cache is enabled |
+| Transfer creation | [X] req/s | [Y] ms | PostgreSQL-backed, no cache in the write path |
+| Balance reads | [X] req/s | [Y] ms | Materialized PostgreSQL balance |
 | Reconciliation | [X] accounts/s | [Y] ms | Record dataset size |
 
 Load tests will use k6. Results will include the workload, concurrency, database
-configuration, deployment size, and whether optional Redis caching is enabled.
-No benchmark number is claimed until it is measured.
+configuration, and deployment size. No benchmark number is claimed until it is
+measured.
 
 ## Limitations and scale considerations
 
