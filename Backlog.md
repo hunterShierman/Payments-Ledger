@@ -5,7 +5,7 @@ Sizes: **S** = under 1 hr, **M** = 1 to 3 hrs, **L** = 3+ hrs. Work top to botto
 ## Epic 1: Foundation
 
 - **PL-1 (S)** Create Rails API app on Postgres with RSpec and FactoryBot. *Done when:* `bundle exec rspec` runs green on an empty suite.
-- **PL-2 (S)** Create private GitHub repo, `.gitignore`, and README stub. *Done when:* first commit pushed, no secrets committed.
+- **PL-2 (S) — Done** Create private GitHub repo, `.gitignore`, and README stub. *Done when:* first commit pushed, no secrets committed.
 - **PL-3 (M)** Set up GitHub Actions CI with a Postgres service container. *Done when:* every push runs specs and the badge is green.
 - **PL-4 (S)** Switch to `structure.sql` schema format. *Done when:* DB constraints survive `db:schema:load`.
 - **PL-5 (M)** Migrations for `accounts`, `transfers`, `ledger_entries` (money as integer cents). *Done when:* tables exist with foreign keys and indexes.
