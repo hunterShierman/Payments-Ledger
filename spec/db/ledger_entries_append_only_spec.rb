@@ -32,18 +32,22 @@ RSpec.describe "ledger entries append-only trigger", type: :model do
     SQL
   end
 
-  it "rejects updates" do
-    expect do
-      connection.execute <<~SQL
-        UPDATE ledger_entries
-        SET amount_cents = 200
-      SQL
-    end.to raise_error(ActiveRecord::StatementInvalid, /ledger_entries is append-only/)
+  context "when an existing entry is updated" do
+    it "rejects the update" do
+      expect do
+        connection.execute <<~SQL
+          UPDATE ledger_entries
+          SET amount_cents = 200
+        SQL
+      end.to raise_error(ActiveRecord::StatementInvalid, /ledger_entries is append-only/)
+    end
   end
 
-  it "rejects deletes" do
-    expect do
-      connection.execute("DELETE FROM ledger_entries")
-    end.to raise_error(ActiveRecord::StatementInvalid, /ledger_entries is append-only/)
+  context "when an existing entry is deleted" do
+    it "rejects the delete" do
+      expect do
+        connection.execute("DELETE FROM ledger_entries")
+      end.to raise_error(ActiveRecord::StatementInvalid, /ledger_entries is append-only/)
+    end
   end
 end
