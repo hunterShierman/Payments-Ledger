@@ -1,6 +1,7 @@
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -69,7 +70,8 @@ CREATE TABLE public.ledger_entries (
     currency character varying NOT NULL,
     entry_type character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT ledger_entries_amount_cents_nonzero CHECK ((amount_cents <> 0))
 );
 
 
@@ -114,7 +116,9 @@ CREATE TABLE public.transfers (
     status character varying DEFAULT 'pending'::character varying NOT NULL,
     request_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT transfers_amount_cents_positive CHECK ((amount_cents > 0)),
+    CONSTRAINT transfers_source_and_destination_different CHECK ((source_account_id <> destination_account_id))
 );
 
 
@@ -279,6 +283,8 @@ ALTER TABLE ONLY public.ledger_entries
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261011230000'),
 ('20261011220854'),
 ('20261011220853'),
 ('20261011220852');
+
