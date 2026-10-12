@@ -32,6 +32,17 @@ The planned service will support:
 The README describes the intended design. Implementation details may change as
 the project is built and measured.
 
+## Local checks
+
+Run `bin/setup --skip-server` after cloning or updating the project. This
+installs the dependencies, prepares the database, and enables the tracked
+Git pre-commit hook.
+
+The hook runs `bin/ci`, which checks the test database, RSpec suite, RuboCop,
+Bundler Audit, and Brakeman before allowing a commit. To intentionally bypass
+the checks for one commit, use Git's standard `--no-verify` option or set
+`SKIP_PRE_COMMIT=1`.
+
 ## Architecture
 
 The API-only Rails application will validate requests, authenticate API keys,
