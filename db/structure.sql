@@ -9,6 +9,19 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
+--
+-- Name: prevent_ledger_entries_mutation(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.prevent_ledger_entries_mutation() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION 'ledger_entries is append-only';
+END;
+$$;
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -244,6 +257,13 @@ CREATE INDEX index_transfers_on_source_account_id ON public.transfers USING btre
 
 
 --
+-- Name: ledger_entries ledger_entries_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER ledger_entries_append_only BEFORE DELETE OR UPDATE ON public.ledger_entries FOR EACH ROW EXECUTE FUNCTION public.prevent_ledger_entries_mutation();
+
+
+--
 -- Name: ledger_entries fk_rails_95dd992850; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -282,8 +302,8 @@ ALTER TABLE ONLY public.ledger_entries
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261011233000'),
 ('20261011230000'),
 ('20261011220854'),
 ('20261011220853'),
 ('20261011220852');
-
