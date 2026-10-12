@@ -1,0 +1,11 @@
+#!/bin/sh
+
+set -e
+
+if [ "${SKIP_PRE_COMMIT:-}" = "1" ]; then
+  echo "Skipping pre-commit checks because SKIP_PRE_COMMIT=1"
+  exit 0
+fi
+
+echo "Running pre-commit checks..."
+bin/ci
