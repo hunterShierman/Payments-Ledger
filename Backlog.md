@@ -4,15 +4,15 @@ Sizes: **S** = under 1 hr, **M** = 1 to 3 hrs, **L** = 3+ hrs. Work top to botto
 
 ## Epic 1: Foundation
 
-- **PL-1 (S)** Create Rails API app on Postgres with RSpec and FactoryBot. *Done when:* `bundle exec rspec` runs green on an empty suite.
+- **PL-1 (S) — Done** Create Rails API app on Postgres with RSpec and FactoryBot. *Done when:* `bundle exec rspec` runs green on an empty suite.
 - **PL-2 (S) — Done** Create private GitHub repo, `.gitignore`, and README stub. *Done when:* first commit pushed, no secrets committed.
-- **PL-3 (M)** Set up GitHub Actions CI with a Postgres service container. *Done when:* every push runs specs and the badge is green.
+- **PL-3 (M) — Done** Set up GitHub Actions CI with a Postgres service container. *Done when:* every push runs specs and the badge is green.
 - **PL-4 (S) — Done** Switch to `structure.sql` schema format. *Done when:* DB constraints survive `db:schema:load`.
 - **PL-5 (M) — Done** Migrations for `accounts`, `transfers`, `ledger_entries` (money as integer cents). *Done when:* tables exist with foreign keys and indexes.
 - **PL-6 (M) — Done** Add database CHECK constraints (positive amount, nonzero entry, source differs from destination). *Done when:* specs prove raw SQL inserts of bad data are rejected.
 - **PL-7 (M) - Done** Enforce append-only on `ledger_entries` with a Postgres trigger that blocks UPDATE and DELETE. *Done when:* a spec proves updates and deletes raise.
 - **PL-8 (M) — Done** `POST /v1/accounts` endpoint. *Done when:* request spec passes, validation errors return clean JSON.
-- **PL-9 (M)** Add a system funding account and implement `POST /v1/accounts/:id/deposits` through the shared money-movement service. *Done when:* every deposit creates a balanced debit and credit, rejects non-positive amounts, and cannot mint an unbalanced ledger entry.
+- **PL-9 (M) — Done** Add a system funding account and implement `POST /v1/accounts/:id/deposits` through the shared money-movement service. *Done when:* every deposit creates a balanced debit and credit, rejects non-positive amounts, and cannot mint an unbalanced ledger entry.
 - **PL-10 (S)** `GET /v1/accounts/:id/balance` reads the materialized `accounts.balance_cents`. *Done when:* the balance matches `SUM(ledger_entries)` in specs.
 
 ## Epic 2: Transfers and idempotency
