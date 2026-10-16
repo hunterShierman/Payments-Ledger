@@ -1,5 +1,7 @@
 # Payments Ledger
 
+[![CI](https://github.com/hunterShierman/Payments-Ledger/actions/workflows/ci.yml/badge.svg)](https://github.com/hunterShierman/Payments-Ledger/actions/workflows/ci.yml)
+
 Payments Ledger is a planned double-entry payments ledger service designed to make
 every cent traceable, transfers safe to retry, and balances correct under
 concurrent requests.

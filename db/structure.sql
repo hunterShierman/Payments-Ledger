@@ -1,6 +1,7 @@
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -35,7 +36,8 @@ CREATE TABLE public.accounts (
     currency character varying NOT NULL,
     balance_cents bigint DEFAULT 0 NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    system boolean DEFAULT false NOT NULL
 );
 
 
@@ -222,6 +224,13 @@ CREATE INDEX idx_on_source_account_id_destination_account_id_28e4e82bad ON publi
 
 
 --
+-- Name: index_accounts_on_currency_for_system_accounts; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_accounts_on_currency_for_system_accounts ON public.accounts USING btree (currency) WHERE system;
+
+
+--
 -- Name: index_ledger_entries_on_account_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -302,6 +311,7 @@ ALTER TABLE ONLY public.ledger_entries
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261015230500'),
 ('20261011233000'),
 ('20261011230000'),
 ('20261011220854'),
