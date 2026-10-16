@@ -34,6 +34,18 @@ module V1
       render json: { errors: error.record.errors.full_messages }, status: :unprocessable_content
     end
 
+    def balance
+      account = Account.find(params[:id])
+
+      render json: {
+        account_id: account.id,
+        currency: account.currency,
+        balance_cents: account.balance_cents
+      }
+    rescue ActiveRecord::RecordNotFound
+      render json: { errors: [ "Account not found" ] }, status: :not_found
+    end
+
     private
 
     def account_params

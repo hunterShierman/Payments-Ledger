@@ -9,7 +9,7 @@ module MoneyMovement
 
     def initialize(account:, amount_cents:, currency:)
       @account = account
-      @amount_cents = Integer(amount_cents, 10)
+      @amount_cents = amount_cents.is_a?(String) ? Integer(amount_cents, 10) : Integer(amount_cents)
       @currency = currency
     rescue ArgumentError, TypeError
       @amount_cents = nil

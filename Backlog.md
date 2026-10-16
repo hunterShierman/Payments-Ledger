@@ -13,7 +13,7 @@ Sizes: **S** = under 1 hr, **M** = 1 to 3 hrs, **L** = 3+ hrs. Work top to botto
 - **PL-7 (M) - Done** Enforce append-only on `ledger_entries` with a Postgres trigger that blocks UPDATE and DELETE. *Done when:* a spec proves updates and deletes raise.
 - **PL-8 (M) — Done** `POST /v1/accounts` endpoint. *Done when:* request spec passes, validation errors return clean JSON.
 - **PL-9 (M) — Done** Add a system funding account and implement `POST /v1/accounts/:id/deposits` through the shared money-movement service. *Done when:* every deposit creates a balanced debit and credit, rejects non-positive amounts, and cannot mint an unbalanced ledger entry.
-- **PL-10 (S)** `GET /v1/accounts/:id/balance` reads the materialized `accounts.balance_cents`. *Done when:* the balance matches `SUM(ledger_entries)` in specs.
+- **PL-10 (S) — Done** `GET /v1/accounts/:id/balance` reads the materialized `accounts.balance_cents`. *Done when:* the balance matches `SUM(ledger_entries)` in specs.
 
 ## Epic 2: Transfers and idempotency
 
