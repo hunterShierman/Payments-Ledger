@@ -54,6 +54,53 @@ RSpec.describe MoneyMovement::Transfer do
       expect(LedgerEntry.count).to eq(0)
     end
 
+    it "rejects a same-account transfer without writing anything" do
+      expect do
+        described_class.call(
+          source_account:,
+          destination_account: source_account,
+          amount_cents: 100,
+          currency: "CAD"
+        )
+      end.to raise_error(MoneyMovement::Transfer::SameAccount, "Source and destination accounts must differ")
+
+      expect(Transfer.count).to eq(0)
+      expect(LedgerEntry.count).to eq(0)
+      expect(source_account.reload.balance_cents).to eq(5_000)
+    end
+
+    it "rejects an unknown account without writing anything" do
+      unknown_account = Account.new(id: 99_999, currency: "CAD")
+
+      expect do
+        described_class.call(
+          source_account:,
+          destination_account: unknown_account,
+          amount_cents: 100,
+          currency: "CAD"
+        )
+      end.to raise_error(MoneyMovement::Transfer::UnknownAccount, "Source or destination account not found")
+
+      expect(Transfer.count).to eq(0)
+      expect(LedgerEntry.count).to eq(0)
+      expect(source_account.reload.balance_cents).to eq(5_000)
+    end
+
+    it "rejects an invalid amount without writing anything" do
+      expect do
+        described_class.call(
+          source_account:,
+          destination_account:,
+          amount_cents: 0,
+          currency: "CAD"
+        )
+      end.to raise_error(MoneyMovement::Transfer::InvalidAmount, "Amount must be greater than 0")
+
+      expect(Transfer.count).to eq(0)
+      expect(LedgerEntry.count).to eq(0)
+      expect(source_account.reload.balance_cents).to eq(5_000)
+    end
+
     it "rejects a transfer that exceeds the source balance without writing anything" do
       expect do
         described_class.call(
