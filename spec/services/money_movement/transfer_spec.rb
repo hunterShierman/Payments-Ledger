@@ -53,5 +53,35 @@ RSpec.describe MoneyMovement::Transfer do
       expect(Transfer.count).to eq(0)
       expect(LedgerEntry.count).to eq(0)
     end
+
+    it "rejects a transfer that exceeds the source balance without writing anything" do
+      expect do
+        described_class.call(
+          source_account:,
+          destination_account:,
+          amount_cents: 5_001,
+          currency: "CAD"
+        )
+      end.to raise_error(MoneyMovement::Transfer::InsufficientFunds, "Insufficient funds")
+
+      expect(Transfer.count).to eq(0)
+      expect(LedgerEntry.count).to eq(0)
+      expect(source_account.reload.balance_cents).to eq(5_000)
+      expect(destination_account.reload.balance_cents).to eq(0)
+    end
+
+    it "allows the system funding account to go negative for deposits" do
+      funding_account = Account.create!(currency: "CAD", system: true)
+
+      described_class.call(
+        source_account: funding_account,
+        destination_account:,
+        amount_cents: 100,
+        currency: "CAD"
+      )
+
+      expect(funding_account.reload.balance_cents).to eq(-100)
+      expect(destination_account.reload.balance_cents).to eq(100)
+    end
   end
 end

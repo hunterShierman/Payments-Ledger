@@ -3,6 +3,7 @@ module MoneyMovement
     class InvalidAmount < StandardError; end
     class CurrencyMismatch < StandardError; end
     class SameAccount < StandardError; end
+    class InsufficientFunds < StandardError; end
 
     def self.call(source_account:, destination_account:, amount_cents:, currency:)
       new(
@@ -30,6 +31,9 @@ module MoneyMovement
           .index_by(&:id)
         source_account = accounts.fetch(@source_account.id)
         destination_account = accounts.fetch(@destination_account.id)
+        if !source_account.system? && source_account.balance_cents < @amount_cents
+          raise InsufficientFunds, "Insufficient funds"
+        end
 
         transfer = ::Transfer.create!(
           source_account:,
