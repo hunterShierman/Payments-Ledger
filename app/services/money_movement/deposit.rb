@@ -1,7 +1,7 @@
 module MoneyMovement
   class Deposit
-    class InvalidAmount < StandardError; end
-    class CurrencyMismatch < StandardError; end
+    InvalidAmount = Transfer::InvalidAmount
+    CurrencyMismatch = Transfer::CurrencyMismatch
 
     def self.call(account:, amount_cents:, currency:)
       new(account:, amount_cents:, currency:).call
@@ -19,34 +19,14 @@ module MoneyMovement
       validate!
 
       Account.transaction do
-        customer_account = Account.lock.find(@account.id)
-        funding_account = Account.lock.find_or_create_by!(currency: @currency, system: true)
-        transfer = Transfer.create!(
+        funding_account = Account.find_or_create_by!(currency: @currency, system: true)
+
+        MoneyMovement::Transfer.call(
           source_account: funding_account,
-          destination_account: customer_account,
+          destination_account: @account,
           amount_cents: @amount_cents,
-          currency: @currency,
-          status: "completed"
+          currency: @currency
         )
-
-        customer_account.increment!(:balance_cents, @amount_cents)
-        funding_account.decrement!(:balance_cents, @amount_cents)
-        LedgerEntry.create!(
-          account: funding_account,
-          transfer:,
-          amount_cents: -@amount_cents,
-          currency: @currency,
-          entry_type: "debit"
-        )
-        LedgerEntry.create!(
-          account: customer_account,
-          transfer:,
-          amount_cents: @amount_cents,
-          currency: @currency,
-          entry_type: "credit"
-        )
-
-        transfer
       end
     end
 
