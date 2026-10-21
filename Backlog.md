@@ -17,7 +17,7 @@ Sizes: **S** = under 1 hr, **M** = 1 to 3 hrs, **L** = 3+ hrs. Work top to botto
 
 ## Epic 2: Transfers and idempotency
 
-- **PL-11 (L)** Shared money-movement service for deposits and account-to-account transfers: one transaction locks accounts, updates materialized balances, and writes balanced debit and credit entries. *Done when:* specs assert entries sum to zero, balances match ledger sums, and all writes exist or neither exists.
+- **PL-11 (L) - Done** Shared money-movement service for deposits and account-to-account transfers: one transaction locks accounts, updates materialized balances, and writes balanced debit and credit entries. *Done when:* specs assert entries sum to zero, balances match ledger sums, and all writes exist or neither exists.
 - **PL-12 (S)** Reject insufficient funds. *Done when:* returns 422 and writes nothing.
 - **PL-13 (S)** Reject invalid transfers (same account, unknown account, bad amount, currency mismatch). *Done when:* each case has a spec.
 - **PL-14 (M)** `POST /v1/transfers` endpoint with consistent error format. *Done when:* happy path and all error paths covered by request specs.
