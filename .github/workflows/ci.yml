@@ -33,7 +33,12 @@ jobs:
           bundler-cache: true
 
       - name: Prepare test database
-        run: bin/rails db:prepare
+        run: |
+          if grep -q '^SET transaction_timeout = 0;$' db/structure.sql; then
+            echo "::error file=db/structure.sql::Schema dump requires PostgreSQL 17+, but CI runs PostgreSQL 16"
+            exit 1
+          fi
+          bin/rails db:prepare
 
       - name: Run RSpec
         run: bundle exec rspec
