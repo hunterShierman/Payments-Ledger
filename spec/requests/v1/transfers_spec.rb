@@ -1,0 +1,87 @@
+require "rails_helper"
+
+RSpec.describe "Transfers API", type: :request do
+  let!(:source_account) { Account.create!(currency: "CAD", balance_cents: 5_000) }
+  let!(:destination_account) { Account.create!(currency: "CAD") }
+
+  describe "POST /v1/transfers" do
+    let(:transfer_params) do
+      {
+        transfer: {
+          source_account_id: source_account.id,
+          destination_account_id: destination_account.id,
+          amount_cents: 1_200,
+          currency: "CAD"
+        }
+      }
+    end
+
+    it "creates a transfer and returns its details" do
+      post "/v1/transfers", params: transfer_params
+
+      expect(response).to have_http_status(:created)
+      expect(response.parsed_body).to include(
+        "id" => be_present,
+        "source_account_id" => source_account.id,
+        "destination_account_id" => destination_account.id,
+        "amount_cents" => 1_200,
+        "currency" => "CAD",
+        "status" => "completed"
+      )
+      expect(source_account.reload.balance_cents).to eq(3_800)
+      expect(destination_account.reload.balance_cents).to eq(1_200)
+      expect(Transfer.count).to eq(1)
+      expect(LedgerEntry.count).to eq(2)
+    end
+
+    it "rejects insufficient funds" do
+      post "/v1/transfers", params: transfer_params.deep_merge(transfer: { amount_cents: 5_001 })
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body).to eq("errors" => [ "Insufficient funds" ])
+      expect(Transfer.count).to eq(0)
+      expect(LedgerEntry.count).to eq(0)
+    end
+
+    it "rejects a same-account transfer" do
+      post "/v1/transfers",
+        params: transfer_params.deep_merge(transfer: { destination_account_id: source_account.id })
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body).to eq(
+        "errors" => [ "Source and destination accounts must differ" ]
+      )
+    end
+
+    it "rejects a currency mismatch" do
+      post "/v1/transfers", params: transfer_params.deep_merge(transfer: { currency: "USD" })
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body).to eq("errors" => [ "Currency does not match account" ])
+    end
+
+    it "returns not found for an unknown account" do
+      post "/v1/transfers",
+        params: transfer_params.deep_merge(transfer: { destination_account_id: 0 })
+
+      expect(response).to have_http_status(:not_found)
+      expect(response.parsed_body).to eq("errors" => [ "Account not found" ])
+    end
+
+    it "rejects an invalid amount" do
+      post "/v1/transfers", params: transfer_params.deep_merge(transfer: { amount_cents: 0 })
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body).to eq("errors" => [ "Amount must be greater than 0" ])
+    end
+
+    it "requires the transfer payload" do
+      post "/v1/transfers", params: {}
+
+      expect(response).to have_http_status(:bad_request)
+      expect(response.parsed_body).to eq(
+        "errors" => [ "param is missing or the value is empty or invalid: transfer" ]
+      )
+    end
+  end
+end
