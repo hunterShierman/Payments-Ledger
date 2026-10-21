@@ -3,6 +3,23 @@ module V1
     rescue_from ActionController::ParameterMissing, with: :render_parameter_missing
 
     def create
+      result = Idempotency::TransferRequest.call(
+        key: request.headers["Idempotency-Key"],
+        request_params: transfer_params.to_h
+      ) do
+        execute_transfer
+      end
+
+      render json: result.body, status: result.status
+    rescue Idempotency::TransferRequest::MissingKey => error
+      render json: { errors: [ error.message ] }, status: :unprocessable_content
+    rescue Idempotency::TransferRequest::Conflict, Idempotency::TransferRequest::InProgress => error
+      render json: { errors: [ error.message ] }, status: :conflict
+    end
+
+    private
+
+    def execute_transfer
       transfer = MoneyMovement::Transfer.call(
         source_account: Account.find(transfer_params[:source_account_id]),
         destination_account: Account.find(transfer_params[:destination_account_id]),
@@ -10,22 +27,21 @@ module V1
         currency: transfer_params[:currency]
       )
 
-      render json: transfer.as_json(
-        only: %i[id source_account_id destination_account_id amount_cents currency status]
-      ), status: :created
+      [
+        :created,
+        transfer.as_json(only: %i[id source_account_id destination_account_id amount_cents currency status])
+      ]
     rescue ActiveRecord::RecordNotFound
-      render json: { errors: [ "Account not found" ] }, status: :not_found
+      [ :not_found, { errors: [ "Account not found" ] } ]
     rescue MoneyMovement::Transfer::InvalidAmount,
       MoneyMovement::Transfer::CurrencyMismatch,
       MoneyMovement::Transfer::SameAccount,
       MoneyMovement::Transfer::InsufficientFunds,
       MoneyMovement::Transfer::UnknownAccount => error
-      render json: { errors: [ error.message ] }, status: :unprocessable_content
+      [ :unprocessable_content, { errors: [ error.message ] } ]
     rescue ActiveRecord::RecordInvalid => error
-      render json: { errors: error.record.errors.full_messages }, status: :unprocessable_content
+      [ :unprocessable_content, { errors: error.record.errors.full_messages } ]
     end
-
-    private
 
     def transfer_params
       params.require(:transfer).permit(

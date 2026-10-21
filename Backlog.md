@@ -22,7 +22,7 @@ Sizes: **S** = under 1 hr, **M** = 1 to 3 hrs, **L** = 3+ hrs. Work top to botto
 - **PL-13 (S) - Done** Reject invalid transfers (same account, unknown account, bad amount, currency mismatch). *Done when:* each case has a spec.
 - **PL-14 (M) - Done** `POST /v1/transfers` endpoint with consistent error format. *Done when:* happy path and all error paths covered by request specs.
 - **PL-15 (M) - Done** `idempotency_keys` table with unique index, storing request fingerprint and response. *Done when:* migration and model specs pass.
-- **PL-16 (L)** Idempotency middleware or concern with an atomic claim-and-execute flow. *Done when:* concurrent first requests with the same key produce one idempotency record and one transfer, retries wait for or return the stored response, a changed payload with the same key errors (422 or 409), a missing key on transfers is rejected, and an interrupted request does not leave an unrecoverable in-progress record.
+- **PL-16 (L) - Done** Idempotency middleware or concern with an atomic claim-and-execute flow. *Done when:* concurrent first requests with the same key produce one idempotency record and one transfer, retries wait for or return the stored response, a changed payload with the same key errors (422 or 409), a missing key on transfers is rejected, and an interrupted request does not leave an unrecoverable in-progress record.
 - **PL-17 (S)** Rollback test: force a failure between the two entry writes. *Done when:* spec proves no partial transfer remains.
 
 ## Epic 3: Concurrency (the key part)

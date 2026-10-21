@@ -17,7 +17,7 @@ RSpec.describe "Transfers API", type: :request do
     end
 
     it "creates a transfer and returns its details" do
-      post "/v1/transfers", params: transfer_params
+      post "/v1/transfers", params: transfer_params, headers: { "Idempotency-Key" => "transfer-1" }
 
       expect(response).to have_http_status(:created)
       expect(response.parsed_body).to include(
@@ -35,7 +35,9 @@ RSpec.describe "Transfers API", type: :request do
     end
 
     it "rejects insufficient funds" do
-      post "/v1/transfers", params: transfer_params.deep_merge(transfer: { amount_cents: 5_001 })
+      post "/v1/transfers",
+        params: transfer_params.deep_merge(transfer: { amount_cents: 5_001 }),
+        headers: { "Idempotency-Key" => "transfer-insufficient" }
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(response.parsed_body).to eq("errors" => [ "Insufficient funds" ])
@@ -45,7 +47,8 @@ RSpec.describe "Transfers API", type: :request do
 
     it "rejects a same-account transfer" do
       post "/v1/transfers",
-        params: transfer_params.deep_merge(transfer: { destination_account_id: source_account.id })
+        params: transfer_params.deep_merge(transfer: { destination_account_id: source_account.id }),
+        headers: { "Idempotency-Key" => "transfer-same-account" }
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(response.parsed_body).to eq(
@@ -54,7 +57,9 @@ RSpec.describe "Transfers API", type: :request do
     end
 
     it "rejects a currency mismatch" do
-      post "/v1/transfers", params: transfer_params.deep_merge(transfer: { currency: "USD" })
+      post "/v1/transfers",
+        params: transfer_params.deep_merge(transfer: { currency: "USD" }),
+        headers: { "Idempotency-Key" => "transfer-currency" }
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(response.parsed_body).to eq("errors" => [ "Currency does not match account" ])
@@ -62,14 +67,17 @@ RSpec.describe "Transfers API", type: :request do
 
     it "returns not found for an unknown account" do
       post "/v1/transfers",
-        params: transfer_params.deep_merge(transfer: { destination_account_id: 0 })
+        params: transfer_params.deep_merge(transfer: { destination_account_id: 0 }),
+        headers: { "Idempotency-Key" => "transfer-unknown" }
 
       expect(response).to have_http_status(:not_found)
       expect(response.parsed_body).to eq("errors" => [ "Account not found" ])
     end
 
     it "rejects an invalid amount" do
-      post "/v1/transfers", params: transfer_params.deep_merge(transfer: { amount_cents: 0 })
+      post "/v1/transfers",
+        params: transfer_params.deep_merge(transfer: { amount_cents: 0 }),
+        headers: { "Idempotency-Key" => "transfer-invalid-amount" }
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(response.parsed_body).to eq("errors" => [ "Amount must be greater than 0" ])
@@ -82,6 +90,43 @@ RSpec.describe "Transfers API", type: :request do
       expect(response.parsed_body).to eq(
         "errors" => [ "param is missing or the value is empty or invalid: transfer" ]
       )
+    end
+
+    it "requires an idempotency key" do
+      post "/v1/transfers", params: transfer_params
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body).to eq(
+        "errors" => [ "Idempotency-Key header is required" ]
+      )
+    end
+
+    it "replays a transfer response without creating a second transfer" do
+      headers = { "Idempotency-Key" => "transfer-replay" }
+      post "/v1/transfers", params: transfer_params, headers: headers
+      first_response = response.parsed_body
+
+      post "/v1/transfers", params: transfer_params, headers: headers
+
+      expect(response).to have_http_status(:created)
+      expect(response.parsed_body).to eq(first_response)
+      expect(Transfer.count).to eq(1)
+      expect(LedgerEntry.count).to eq(2)
+    end
+
+    it "rejects a changed payload with the same idempotency key" do
+      headers = { "Idempotency-Key" => "transfer-conflict" }
+      post "/v1/transfers", params: transfer_params, headers: headers
+
+      post "/v1/transfers",
+        params: transfer_params.deep_merge(transfer: { amount_cents: 200 }),
+        headers: headers
+
+      expect(response).to have_http_status(:conflict)
+      expect(response.parsed_body).to eq(
+        "errors" => [ "Idempotency key was used with a different request" ]
+      )
+      expect(Transfer.count).to eq(1)
     end
   end
 end
