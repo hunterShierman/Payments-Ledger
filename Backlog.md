@@ -32,7 +32,7 @@ Sizes: **S** = under 1 hr, **M** = 1 to 3 hrs, **L** = 3+ hrs. Work top to botto
 - **PL-20 (M) - Done** Lock all affected accounts in a consistent order (lowest ID first). *Done when:* simultaneous A-to-B and B-to-A transfers do not deadlock, lose updates, or violate the zero-sum invariant.
 - **PL-21 (M) - Done** Retry only transient serialization failures, deadlocks, and transient database connection failures with bounded attempts and backoff. *Done when:* specs cover successful retry and exhausted retries, and prove validation errors and insufficient-funds errors are never retried.
 - **PL-22 (M) - Done** Test: 100 concurrent withdrawals never overdraw the account. *Done when:* final balance is never negative, successful withdrawal amounts equal total debited, and `balance_cents` equals the account's ledger sum.
-- **PL-23 (M)** Test: concurrent requests with the same idempotency key create exactly one transfer. *Done when:* exactly one transfer row, one idempotency record, and one stored response exist.
+- **PL-23 (M) - Done** Test: concurrent requests with the same idempotency key create exactly one transfer. *Done when:* exactly one transfer row, one idempotency record, and one stored response exist.
 - **PL-23A (M)** Test: concurrent bidirectional transfers between the same two accounts. *Done when:* A-to-B and B-to-A requests complete without deadlock, final materialized balances match ledger sums, and every committed transfer has balanced entries.
 - **PL-24 (M)** Write up "why row locks over serializable isolation" in `docs/decisions.md`. *Done when:* covers tradeoffs, contention, and failure modes in your own words.
 
