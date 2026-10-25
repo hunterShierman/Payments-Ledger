@@ -91,6 +91,48 @@ RSpec.describe MoneyMovement::Transfer, :concurrency, use_transactional_fixtures
     expect(LedgerEntry.sum(:amount_cents)).to eq(0)
   end
 
+  it "never overdraws an account across 100 concurrent withdrawals" do
+    source_account = Account.create!(currency: "CAD", balance_cents: 5_000)
+    destination_accounts = 100.times.map { Account.create!(currency: "CAD") }
+    start_gate = Queue.new
+    results = Queue.new
+
+    threads = destination_accounts.map do |destination_account|
+      Thread.new do
+        ActiveRecord::Base.connection_pool.with_connection do
+          start_gate.pop
+          results << begin
+            described_class.call(
+              source_account: Account.find(source_account.id),
+              destination_account: Account.find(destination_account.id),
+              amount_cents: 100,
+              currency: "CAD"
+            )
+            :success
+          rescue MoneyMovement::Transfer::InsufficientFunds
+            :insufficient_funds
+          rescue StandardError => error
+            error
+          end
+        end
+      end
+    end
+
+    destination_accounts.length.times { start_gate << true }
+    Timeout.timeout(30) { threads.each(&:join) }
+
+    outcomes = destination_accounts.length.times.map { results.pop }
+    successful_withdrawals = outcomes.count(:success)
+    expect(outcomes).to all(be_a(Symbol))
+    expect(successful_withdrawals).to eq(50)
+    expect(outcomes.count(:insufficient_funds)).to eq(50)
+    expect(source_account.reload.balance_cents).to eq(0)
+    expect(source_account.balance_cents).to be >= 0
+    expect(source_account.ledger_entries.sum(:amount_cents)).to eq(-successful_withdrawals * 100)
+    expect(source_account.balance_cents - 5_000).to eq(source_account.ledger_entries.sum(:amount_cents))
+    expect(Transfer.count).to eq(successful_withdrawals)
+  end
+
   def clean_database
     ActiveRecord::Base.connection.execute(
       "TRUNCATE ledger_entries, transfers, accounts RESTART IDENTITY CASCADE"
