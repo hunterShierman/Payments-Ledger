@@ -27,7 +27,7 @@ Sizes: **S** = under 1 hr, **M** = 1 to 3 hrs, **L** = 3+ hrs. Work top to botto
 
 ## Epic 3: Concurrency (the key part)
 
-- **PL-18 (L)** Write a failing concurrency test that reproduces the overdraft race (threads, real DB connections, no transactional fixtures). *Done when:* the test reliably shows an overdraft before the fix.
+- **PL-18 (L) - Done** Write a failing concurrency test that reproduces the overdraft race (threads, real DB connections, no transactional fixtures). *Done when:* the test reliably shows an overdraft before the fix.
 - **PL-19 (M)** Fix the overdraft race with row locks (`SELECT ... FOR UPDATE`) inside the money-movement transaction. *Done when:* the PL-18 test passes and the materialized balance remains equal to the ledger sum.
 - **PL-20 (M)** Lock all affected accounts in a consistent order (lowest ID first). *Done when:* simultaneous A-to-B and B-to-A transfers do not deadlock, lose updates, or violate the zero-sum invariant.
 - **PL-21 (M)** Retry only transient serialization failures, deadlocks, and transient database connection failures with bounded attempts and backoff. *Done when:* specs cover successful retry and exhausted retries, and prove validation errors and insufficient-funds errors are never retried.
