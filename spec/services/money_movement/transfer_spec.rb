@@ -47,6 +47,73 @@ RSpec.describe MoneyMovement::Transfer do
       expect(destination_account.reload.balance_cents).to eq(0)
     end
 
+    it "retries a transient deadlock and succeeds" do
+      attempts = 0
+      allow(LedgerEntry).to receive(:create!).and_wrap_original do |original, *args|
+        attempts += 1
+        raise ActiveRecord::Deadlocked if attempts == 1
+
+        original.call(*args)
+      end
+      allow(Kernel).to receive(:sleep)
+
+      transfer = described_class.call(
+        source_account:,
+        destination_account:,
+        amount_cents: 1_200,
+        currency: "CAD"
+      )
+
+      expect(transfer).to be_persisted
+      expect(attempts).to eq(3)
+      expect(Kernel).to have_received(:sleep).with(0.01)
+      expect(Transfer.count).to eq(1)
+    end
+
+    it "raises after exhausting transient failure retries" do
+      allow(Account).to receive(:transaction).and_raise(ActiveRecord::SerializationFailure)
+      allow(Kernel).to receive(:sleep)
+
+      expect do
+        described_class.call(
+          source_account:,
+          destination_account:,
+          amount_cents: 1_200,
+          currency: "CAD"
+        )
+      end.to raise_error(ActiveRecord::SerializationFailure)
+
+      expect(Account).to have_received(:transaction).exactly(3).times
+      expect(Kernel).to have_received(:sleep).with(0.01)
+      expect(Kernel).to have_received(:sleep).with(0.02)
+    end
+
+    it "does not retry validation failures" do
+      expect(Account).not_to receive(:transaction)
+
+      expect do
+        described_class.call(
+          source_account:,
+          destination_account:,
+          amount_cents: 0,
+          currency: "CAD"
+        )
+      end.to raise_error(MoneyMovement::Transfer::InvalidAmount)
+    end
+
+    it "does not retry insufficient-funds failures" do
+      expect(Account).to receive(:transaction).once.and_call_original
+
+      expect do
+        described_class.call(
+          source_account:,
+          destination_account:,
+          amount_cents: 5_001,
+          currency: "CAD"
+        )
+      end.to raise_error(MoneyMovement::Transfer::InsufficientFunds)
+    end
+
     it "rejects a currency mismatch without writing anything" do
       expect do
         described_class.call(
