@@ -1,5 +1,8 @@
 module MoneyMovement
   class Transfer
+    MAX_ATTEMPTS = 3
+    RETRY_BACKOFFS = [ 0.01, 0.02 ].freeze
+
     class InvalidAmount < StandardError; end
     class CurrencyMismatch < StandardError; end
     class SameAccount < StandardError; end
@@ -27,6 +30,24 @@ module MoneyMovement
     def call
       validate!
 
+      attempts = 0
+      begin
+        attempts += 1
+        transfer
+      rescue ActiveRecord::SerializationFailure,
+        ActiveRecord::Deadlocked,
+        ActiveRecord::ConnectionNotEstablished,
+        ActiveRecord::ConnectionFailed => error
+        raise error if attempts >= MAX_ATTEMPTS
+
+        Kernel.sleep RETRY_BACKOFFS.fetch(attempts - 1)
+        retry
+      end
+    end
+
+    private
+
+    def transfer
       Account.transaction do
         accounts = Account.where(id: [ @source_account.id, @destination_account.id ]).order(:id).lock
           .index_by(&:id)
@@ -67,8 +88,6 @@ module MoneyMovement
         transfer
       end
     end
-
-    private
 
     def validate!
       raise InvalidAmount, "Amount must be greater than 0" unless @amount_cents.is_a?(Integer) && @amount_cents.positive?
