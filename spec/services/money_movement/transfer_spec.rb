@@ -22,8 +22,14 @@ RSpec.describe MoneyMovement::Transfer do
       expect(destination_account.ledger_entries.sum(:amount_cents)).to eq(destination_account.balance_cents)
     end
 
-    it "rolls back the transfer and balances when an entry write fails" do
-      allow(LedgerEntry).to receive(:create!).and_raise(ActiveRecord::RecordInvalid)
+    it "rolls back the transfer and balances when the second entry write fails" do
+      entry_writes = 0
+      allow(LedgerEntry).to receive(:create!).and_wrap_original do |original, *args|
+        entry_writes += 1
+        raise ActiveRecord::RecordInvalid, LedgerEntry.new if entry_writes == 2
+
+        original.call(*args)
+      end
 
       expect do
         described_class.call(
@@ -34,6 +40,7 @@ RSpec.describe MoneyMovement::Transfer do
         )
       end.to raise_error(ActiveRecord::RecordInvalid)
 
+      expect(entry_writes).to eq(2)
       expect(Transfer.count).to eq(0)
       expect(LedgerEntry.count).to eq(0)
       expect(source_account.reload.balance_cents).to eq(5_000)
