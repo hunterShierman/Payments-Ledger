@@ -2,21 +2,38 @@
 
 [![CI](https://github.com/hunterShierman/Payments-Ledger/actions/workflows/ci.yml/badge.svg)](https://github.com/hunterShierman/Payments-Ledger/actions/workflows/ci.yml)
 
-Payments Ledger is a planned double-entry payments ledger service designed to make
-every cent traceable, transfers safe to retry, and balances correct under
-concurrent requests.
+Payments Ledger is a double-entry payments ledger service designed to make every
+cent traceable, transfers safe to retry, and balances correct under concurrent
+requests.
 
-The project focuses on backend correctness rather than CRUD breadth. PostgreSQL
-will be the source of truth for accounts, transfers, ledger entries, and
+The project focuses on backend correctness rather than CRUD breadth. PostgreSQL is the source of truth for accounts, transfers, ledger entries, and
 balances. The central invariant is that a committed transfer has equal debit and
 credit entries, so the ledger always sums to zero.
 
 This is a personal project and is not connected to any employer or production
 payment system.
 
+## Current status
+
+The current implementation includes:
+
+- Account creation, deposits, and balance reads
+- Double-entry transfers with integer-cent amounts
+- Database-enforced amount, account, and append-only ledger constraints
+- Idempotency-key replay and payload-conflict handling for transfers
+- Row locking and bounded retries for concurrent money movement
+- Request, service, and PostgreSQL-backed concurrency specs
+
+The following items remain planned and are not currently exposed by the API:
+
+- Transfer reads and ledger-entry pagination
+- API-key authentication
+- Reconciliation jobs
+- Audit logging, structured metrics, and deployment
+
 ## Scope
 
-The planned service will support:
+The target service will support:
 
 - Account creation, deposits, and balance reads
 - Double-entry transfers between accounts
@@ -31,8 +48,8 @@ The planned service will support:
 - Structured logs and basic metrics
 - Reproducible concurrency and load tests
 
-The README describes the intended design. Implementation details may change as
-the project is built and measured.
+The README describes both the current implementation and the intended design.
+The target design may change as the project is built and measured.
 
 ## Local checks
 
@@ -47,11 +64,13 @@ the checks for one commit, use Git's standard `--no-verify` option or set
 
 ## Architecture
 
-The API-only Rails application will validate requests, authenticate API keys,
-and execute money-movement commands. PostgreSQL will own transactional state
-and enforce invariants. A Rails-native background job runner will perform
-reconciliation and other non-critical work; it will not be required to complete
-a transfer.
+The API-only Rails application validates requests and executes money-movement
+commands. PostgreSQL owns transactional state and enforces invariants. API-key
+authentication, reconciliation, and other operational components remain part of
+the target architecture.
+
+The diagrams describe the target architecture, including planned authentication,
+reconciliation, audit, and operational components.
 
 ### C1: System context
 
@@ -67,8 +86,8 @@ system-context and C2 container views.
 
 ## Data model
 
-The exact schema will be finalized during implementation, but the planned
-entities are:
+The schema currently includes the entities below. Fields and future entities may
+continue to evolve during implementation:
 
 ### `accounts`
 
@@ -78,8 +97,8 @@ entities are:
 - timestamps
 
 `balance_cents` is an integer maintained transactionally with ledger writes. It
-is the read path for balances and will be checked against the account's ledger
-total by reconciliation. The service will not use a cache in the initial
+is the read path for balances. A future reconciliation job will check it against
+the account's ledger total. The service does not use a cache in the initial
 implementation.
 
 ### `transfers`
@@ -106,11 +125,11 @@ basis for idempotent retries.
 - timestamps
 
 Each money movement creates one debit and one credit in the same database
-transaction. Deposits will use a system funding account as the balancing side
-instead of creating unbalanced money. Ledger entries are append-only. A reversal
-creates new entries instead of editing historical entries. Append-only behavior
-will be enforced with a database trigger or restricted database permissions,
-rather than relying only on application conventions.
+transaction. Deposits use a system funding account as the balancing side instead
+of creating unbalanced money. Ledger entries are append-only. A future reversal
+will create new entries instead of editing historical entries. Append-only
+behavior is enforced with a database trigger rather than relying only on
+application conventions.
 
 ### `idempotency_keys`
 
@@ -120,9 +139,9 @@ rather than relying only on application conventions.
 - stored response or transfer reference
 - timestamps
 
-A unique index will ensure that concurrent requests with the same key create
-exactly one transfer. Reusing a key with a different payload will return an
-error rather than silently changing the original operation.
+A unique index ensures that concurrent requests with the same key cannot create
+independent claims. Reusing a key with a different payload returns an error
+rather than silently changing the original operation.
 
 ### Database integrity
 
@@ -130,11 +149,17 @@ The schema will use foreign keys, `NOT NULL` constraints, check constraints, and
 unique indexes for invariants that must hold regardless of which code path
 writes to the database.
 
-## Proposed API
+## API
 
-The following REST surface is the planned contract. It may evolve as the
-implementation and tests clarify the domain model. Deposits and account-to-
-account transfers will share the same transactional money-movement service.
+The following endpoints are currently implemented:
+
+- `POST /v1/accounts`
+- `POST /v1/accounts/:id/deposits`
+- `GET /v1/accounts/:id/balance`
+- `POST /v1/transfers`
+
+Deposits and account-to-account transfers share the same transactional
+money-movement service.
 
 ### Create an account
 
@@ -150,7 +175,7 @@ Content-Type: application/json
 
 ```json
 {
-  "id": "acc_123",
+  "id": 1,
   "currency": "CAD",
   "balance_cents": 0
 }
@@ -159,7 +184,7 @@ Content-Type: application/json
 ### Deposit funds
 
 ```http
-POST /v1/accounts/acc_123/deposits
+POST /v1/accounts/1/deposits
 Authorization: Bearer <api-key>
 Content-Type: application/json
 
@@ -171,7 +196,7 @@ Content-Type: application/json
 
 ```json
 {
-  "account_id": "acc_123",
+  "account_id": 1,
   "amount_cents": 5000,
   "currency": "CAD",
   "balance_cents": 5000
@@ -184,13 +209,13 @@ account and the customer account.
 ### Read a balance
 
 ```http
-GET /v1/accounts/acc_123/balance
+GET /v1/accounts/1/balance
 Authorization: Bearer <api-key>
 ```
 
 ```json
 {
-  "account_id": "acc_123",
+  "account_id": 1,
   "currency": "CAD",
   "balance_cents": 5000
 }
@@ -205,8 +230,8 @@ Idempotency-Key: transfer-request-001
 Content-Type: application/json
 
 {
-  "source_account_id": "acc_123",
-  "destination_account_id": "acc_456",
+  "source_account_id": 1,
+  "destination_account_id": 2,
   "amount_cents": 1250,
   "currency": "CAD"
 }
@@ -214,10 +239,10 @@ Content-Type: application/json
 
 ```json
 {
-  "id": "txn_789",
-  "status": "posted",
-  "source_account_id": "acc_123",
-  "destination_account_id": "acc_456",
+  "id": 1,
+  "status": "completed",
+  "source_account_id": 1,
+  "destination_account_id": 2,
   "amount_cents": 1250,
   "currency": "CAD"
 }
@@ -227,17 +252,17 @@ Retrying the request with the same idempotency key and payload returns the
 stored result. The same key with a different payload returns a client error.
 Insufficient funds also returns a client error and creates no partial transfer.
 
-### Read a transfer
+### Planned: read a transfer
 
 ```http
-GET /v1/transfers/txn_789
+GET /v1/transfers/1
 Authorization: Bearer <api-key>
 ```
 
-### List ledger entries
+### Planned: list ledger entries
 
 ```http
-GET /v1/accounts/acc_123/ledger-entries?limit=50&cursor=<cursor>
+GET /v1/accounts/1/ledger-entries?limit=50&cursor=<cursor>
 Authorization: Bearer <api-key>
 ```
 
@@ -318,6 +343,13 @@ The most important tests will run real concurrent requests against PostgreSQL:
 These tests are intended to demonstrate the guarantees that ordinary sequential
 request tests cannot prove.
 
+## Code documentation convention
+
+Every method uses at least a concise purpose comment, including small private
+helpers and migration methods. Public domain services additionally use
+lightweight YARD-style comments for non-obvious side effects or invariants,
+parameters, return values, and domain-specific exceptions.
+
 ## Local development
 
 Prerequisites:
@@ -326,7 +358,7 @@ Prerequisites:
 - PostgreSQL
 - Node.js only if required by the selected Rails setup
 
-The planned local workflow is:
+The local workflow is:
 
 ```bash
 git clone <repository-url>

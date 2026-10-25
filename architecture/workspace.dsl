@@ -1,4 +1,4 @@
-workspace "Payments Ledger" "Architecture views for the planned Payments Ledger service." {
+workspace "Payments Ledger" "Target architecture views for the Payments Ledger service." {
 
     model {
         client = person "API client" "A client that creates accounts, deposits funds, reads balances, and submits transfers."

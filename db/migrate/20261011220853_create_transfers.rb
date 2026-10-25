@@ -1,4 +1,5 @@
 class CreateTransfers < ActiveRecord::Migration[8.1]
+  # Creates transfer records and indexes account-to-account movement lookups.
   def change
     create_table :transfers do |t|
       t.references :source_account, null: false, foreign_key: { to_table: :accounts }

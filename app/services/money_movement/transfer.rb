@@ -1,4 +1,6 @@
 module MoneyMovement
+  # Moves money between two accounts while preserving the balance and
+  # double-entry ledger invariants.
   class Transfer
     MAX_ATTEMPTS = 3
     RETRY_BACKOFFS = [ 0.01, 0.02 ].freeze
@@ -9,6 +11,22 @@ module MoneyMovement
     class InsufficientFunds < StandardError; end
     class UnknownAccount < StandardError; end
 
+    # Transfers a positive amount atomically and returns the completed transfer.
+    #
+    # Both accounts are locked in ID order to serialize conflicting transfers.
+    # Transient serialization, deadlock, and connection failures are retried
+    # with bounded backoff; validation and business-rule failures are not retried.
+    #
+    # @param source_account [Account] account to debit
+    # @param destination_account [Account] account to credit
+    # @param amount_cents [Integer, String] positive amount in cents
+    # @param currency [String] three-letter currency code matching both accounts
+    # @return [::Transfer] the persisted transfer with two ledger entries
+    # @raise [InvalidAmount] if the amount is not positive
+    # @raise [CurrencyMismatch] if the currency does not match either account
+    # @raise [SameAccount] if both account references identify the same account
+    # @raise [InsufficientFunds] if a non-system source lacks sufficient funds
+    # @raise [UnknownAccount] if either account does not exist
     def self.call(source_account:, destination_account:, amount_cents:, currency:)
       new(
         source_account:,
@@ -18,6 +36,7 @@ module MoneyMovement
       ).call
     end
 
+    # Stores the transfer inputs and normalizes the amount to integer cents.
     def initialize(source_account:, destination_account:, amount_cents:, currency:)
       @source_account = source_account
       @destination_account = destination_account
@@ -27,6 +46,7 @@ module MoneyMovement
       @amount_cents = nil
     end
 
+    # Validates the request and retries the transactional transfer when safe.
     def call
       validate!
 
@@ -47,8 +67,11 @@ module MoneyMovement
 
     private
 
+    # Locks accounts, updates balances, and writes the balanced transfer entries.
     def transfer
       Account.transaction do
+        # Lock in a consistent order so A-to-B and B-to-A transfers cannot
+        # deadlock while acquiring the same pair of account locks.
         accounts = Account.where(id: [ @source_account.id, @destination_account.id ]).order(:id).lock
           .index_by(&:id)
         source_account = accounts[@source_account.id]
@@ -89,6 +112,7 @@ module MoneyMovement
       end
     end
 
+    # Rejects invalid account references, amounts, account pairs, and currencies.
     def validate!
       raise InvalidAmount, "Amount must be greater than 0" unless @amount_cents.is_a?(Integer) && @amount_cents.positive?
       unless account_reference_valid?(@source_account) && account_reference_valid?(@destination_account)
@@ -100,10 +124,12 @@ module MoneyMovement
       end
     end
 
+    # Checks that the supplied value is a persisted Account record.
     def account_reference_valid?(account)
       account.is_a?(Account) && account.persisted?
     end
 
+    # Checks that both accounts use the requested transfer currency.
     def accounts_match_currency?(source_account, destination_account)
       source_account.currency == @currency && destination_account.currency == @currency
     end

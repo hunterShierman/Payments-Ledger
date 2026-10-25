@@ -4,6 +4,7 @@ RSpec.describe Idempotency::TransferRequest do
   let(:params) { { "amount_cents" => 100, "currency" => "CAD" } }
 
   it "executes once and replays the stored response" do
+    # The block represents the money movement that must run only on the first claim.
     executions = 0
     execute = lambda do
       executions += 1

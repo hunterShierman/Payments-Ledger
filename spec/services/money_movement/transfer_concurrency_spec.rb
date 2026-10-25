@@ -18,6 +18,7 @@ RSpec.describe MoneyMovement::Transfer, :concurrency, use_transactional_fixtures
 
     threads = destination_accounts.map do |destination_account|
       Thread.new do
+        # Each thread needs its own real connection and transaction visibility.
         ActiveRecord::Base.connection_pool.with_connection do
           start_gate.pop
           results << begin
@@ -133,6 +134,7 @@ RSpec.describe MoneyMovement::Transfer, :concurrency, use_transactional_fixtures
     expect(Transfer.count).to eq(successful_withdrawals)
   end
 
+  # Truncates shared tables so real concurrent connections start clean.
   def clean_database
     ActiveRecord::Base.connection.execute(
       "TRUNCATE ledger_entries, transfers, accounts RESTART IDENTITY CASCADE"

@@ -1,4 +1,5 @@
 class CreateLedgerEntries < ActiveRecord::Migration[8.1]
+  # Creates signed ledger entries associated with accounts and transfers.
   def change
     create_table :ledger_entries do |t|
       t.references :account, null: false, foreign_key: true
