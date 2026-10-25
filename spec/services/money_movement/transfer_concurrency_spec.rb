@@ -84,11 +84,15 @@ RSpec.describe MoneyMovement::Transfer, :concurrency, use_transactional_fixtures
     outcomes = 2.times.map { results.pop }
     expect(outcomes).to all eq(:success)
     expect(Transfer.count).to eq(2)
-    expect(Transfer.all).to all satisfy { |transfer| transfer.ledger_entries.sum(:amount_cents).zero? }
+    expect(Transfer.all).to all satisfy { |transfer|
+      transfer.ledger_entries.count == 2 &&
+        transfer.ledger_entries.pluck(:entry_type).sort == %w[credit debit] &&
+        transfer.ledger_entries.sum(:amount_cents).zero?
+    }
     expect(account_a.reload.balance_cents).to eq(1_000)
     expect(account_b.reload.balance_cents).to eq(1_000)
-    expect(account_a.ledger_entries.sum(:amount_cents)).to eq(0)
-    expect(account_b.ledger_entries.sum(:amount_cents)).to eq(0)
+    expect(account_a.balance_cents - 1_000).to eq(account_a.ledger_entries.sum(:amount_cents))
+    expect(account_b.balance_cents - 1_000).to eq(account_b.ledger_entries.sum(:amount_cents))
     expect(LedgerEntry.sum(:amount_cents)).to eq(0)
   end
 
