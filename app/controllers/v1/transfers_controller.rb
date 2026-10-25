@@ -1,7 +1,12 @@
 module V1
+  # Exposes idempotent account-to-account transfers over the v1 API.
   class TransfersController < ApplicationController
     rescue_from ActionController::ParameterMissing, with: :render_parameter_missing
 
+    # Creates a transfer and returns the stored response for an idempotent retry.
+    #
+    # @return [void] renders a JSON response with the transfer or validation error
+    # @raise [Idempotency::TransferRequest::MissingKey] when the header is absent
     def create
       result = Idempotency::TransferRequest.call(
         key: request.headers["Idempotency-Key"],
@@ -19,6 +24,7 @@ module V1
 
     private
 
+    # Executes the domain transfer and converts known failures into API results.
     def execute_transfer
       transfer = MoneyMovement::Transfer.call(
         source_account: Account.find(transfer_params[:source_account_id]),
@@ -43,6 +49,7 @@ module V1
       [ :unprocessable_content, { errors: error.record.errors.full_messages } ]
     end
 
+    # Permits the fields accepted by the transfer endpoint.
     def transfer_params
       params.require(:transfer).permit(
         :source_account_id,
@@ -52,6 +59,7 @@ module V1
       )
     end
 
+    # Renders missing required request parameters as a bad-request response.
     def render_parameter_missing(error)
       render json: { errors: [ error.message ] }, status: :bad_request
     end

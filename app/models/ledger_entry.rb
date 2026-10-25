@@ -1,3 +1,7 @@
+# An append-only, signed account-perspective entry for a transfer.
+#
+# Debits are negative and credits are positive. Corrections must be represented
+# by new entries, preserving the historical sequence of accounting events.
 class LedgerEntry < ApplicationRecord
   belongs_to :account
   belongs_to :transfer

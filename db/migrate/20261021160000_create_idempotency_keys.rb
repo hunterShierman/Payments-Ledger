@@ -1,4 +1,5 @@
 class CreateIdempotencyKeys < ActiveRecord::Migration[8.1]
+  # Creates unique request claims and storage for replayable responses.
   def change
     create_table :idempotency_keys do |t|
       t.string :key, null: false

@@ -1,3 +1,7 @@
+# A business money-movement operation between two distinct accounts.
+#
+# Each persisted transfer is expected to have one debit and one credit
+# LedgerEntry created in the same transaction.
 class Transfer < ApplicationRecord
   belongs_to :source_account, class_name: "Account"
   belongs_to :destination_account, class_name: "Account"
