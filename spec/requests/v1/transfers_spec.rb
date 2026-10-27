@@ -128,5 +128,54 @@ RSpec.describe "Transfers API", type: :request do
       )
       expect(Transfer.count).to eq(1)
     end
+
+    describe "POST /v1/transfers/:id/reversal" do
+      let!(:transfer) do
+        MoneyMovement::Transfer.call(
+          source_account:,
+          destination_account:,
+          amount_cents: 1_200,
+          currency: "CAD"
+        )
+      end
+
+      it "creates an offsetting transfer" do
+        post "/v1/transfers/#{transfer.id}/reversal", headers: { "Idempotency-Key" => "reversal-1" }
+
+        expect(response).to have_http_status(:created)
+        expect(response.parsed_body).to include(
+          "source_account_id" => destination_account.id,
+          "destination_account_id" => source_account.id,
+          "amount_cents" => 1_200,
+          "currency" => "CAD",
+          "status" => "completed",
+          "reversal_of_transfer_id" => transfer.id
+        )
+        expect(transfer.reload.status).to eq("reversed")
+      end
+
+      it "rejects a second reversal" do
+        headers = { "Idempotency-Key" => "reversal-2" }
+        post "/v1/transfers/#{transfer.id}/reversal", headers: headers
+        post "/v1/transfers/#{transfer.id}/reversal", headers: { "Idempotency-Key" => "reversal-3" }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.parsed_body).to eq("errors" => [ "Transfer has already been reversed" ])
+      end
+
+      it "requires an idempotency key" do
+        post "/v1/transfers/#{transfer.id}/reversal"
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.parsed_body).to eq("errors" => [ "Idempotency-Key header is required" ])
+      end
+
+      it "returns not found for an unknown transfer" do
+        post "/v1/transfers/0/reversal", headers: { "Idempotency-Key" => "reversal-missing" }
+
+        expect(response).to have_http_status(:not_found)
+        expect(response.parsed_body).to eq("errors" => [ "Transfer not found" ])
+      end
+    end
   end
 end

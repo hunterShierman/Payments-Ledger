@@ -157,6 +157,7 @@ The following endpoints are currently implemented:
 - `POST /v1/accounts/:id/deposits`
 - `GET /v1/accounts/:id/balance`
 - `POST /v1/transfers`
+- `POST /v1/transfers/:id/reversal`
 
 Deposits and account-to-account transfers share the same transactional
 money-movement service.
@@ -251,6 +252,17 @@ Content-Type: application/json
 Retrying the request with the same idempotency key and payload returns the
 stored result. The same key with a different payload returns a client error.
 Insufficient funds also returns a client error and creates no partial transfer.
+
+### Reverse a transfer
+
+```http
+POST /v1/transfers/1/reversal
+Idempotency-Key: reversal-request-001
+```
+
+Reversals create a new transfer with the source and destination swapped and
+append offsetting ledger entries. The original transfer and its ledger entries
+are never edited; a second reversal of the same transfer is rejected.
 
 ### Planned: read a transfer
 
