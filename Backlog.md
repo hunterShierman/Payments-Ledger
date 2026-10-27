@@ -38,7 +38,7 @@ Sizes: **S** = under 1 hr, **M** = 1 to 3 hrs, **L** = 3+ hrs. Work top to botto
 
 ## Epic 4: Reconciliation and audit
 
-- **PL-25 (M)** Reversal flow: a transfer reversal creates new offsetting entries and never edits old ones. *Done when:* reversing twice is rejected, original entries are untouched.
+- **PL-25 (M) — Done** Reversal flow: a transfer reversal creates new offsetting entries and never edits old ones. *Done when:* reversing twice is rejected, original entries are untouched.
 - **PL-26 (L)** Reconciliation job that recomputes every materialized balance from entries and records drift. *Done when:* a spec corrupts `balance_cents` and the job records `account_id`, stored balance, ledger balance, difference, check time, and drift status without silently repairing the value.
 - **PL-27 (M)** Background job runner using ActiveJob with Solid Queue or another Rails-native runner. *Done when:* reconciliation runs on a local schedule without Redis.
 - **PL-28 (M)** API key authentication. *Done when:* requests without a valid key get 401, keys are stored hashed.

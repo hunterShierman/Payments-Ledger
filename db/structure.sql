@@ -165,6 +165,7 @@ CREATE TABLE public.transfers (
     request_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
+    reversal_of_transfer_id bigint,
     CONSTRAINT transfers_amount_cents_positive CHECK ((amount_cents > 0)),
     CONSTRAINT transfers_source_and_destination_different CHECK ((source_account_id <> destination_account_id))
 );
@@ -315,6 +316,13 @@ CREATE INDEX index_transfers_on_destination_account_id ON public.transfers USING
 
 
 --
+-- Name: index_transfers_on_reversal_of_transfer_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_transfers_on_reversal_of_transfer_id ON public.transfers USING btree (reversal_of_transfer_id);
+
+
+--
 -- Name: index_transfers_on_source_account_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -326,6 +334,14 @@ CREATE INDEX index_transfers_on_source_account_id ON public.transfers USING btre
 --
 
 CREATE TRIGGER ledger_entries_append_only BEFORE DELETE OR UPDATE ON public.ledger_entries FOR EACH ROW EXECUTE FUNCTION public.prevent_ledger_entries_mutation();
+
+
+--
+-- Name: transfers fk_rails_6461e65f5f; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.transfers
+    ADD CONSTRAINT fk_rails_6461e65f5f FOREIGN KEY (reversal_of_transfer_id) REFERENCES public.transfers(id);
 
 
 --
@@ -367,6 +383,7 @@ ALTER TABLE ONLY public.ledger_entries
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261026214800'),
 ('20261021160000'),
 ('20261015230500'),
 ('20261011233000'),

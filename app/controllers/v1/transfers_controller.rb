@@ -22,6 +22,22 @@ module V1
       render json: { errors: [ error.message ] }, status: :conflict
     end
 
+    # Reverses a transfer and returns the stored response for an idempotent retry.
+    def reversal
+      result = Idempotency::TransferRequest.call(
+        key: request.headers["Idempotency-Key"],
+        request_params: { transfer_id: params[:id] }
+      ) do
+        execute_reversal
+      end
+
+      render json: result.body, status: result.status
+    rescue Idempotency::TransferRequest::MissingKey => error
+      render json: { errors: [ error.message ] }, status: :unprocessable_content
+    rescue Idempotency::TransferRequest::Conflict, Idempotency::TransferRequest::InProgress => error
+      render json: { errors: [ error.message ] }, status: :conflict
+    end
+
     private
 
     # Executes the domain transfer and converts known failures into API results.
@@ -44,6 +60,23 @@ module V1
       MoneyMovement::Transfer::SameAccount,
       MoneyMovement::Transfer::InsufficientFunds,
       MoneyMovement::Transfer::UnknownAccount => error
+      [ :unprocessable_content, { errors: [ error.message ] } ]
+    rescue ActiveRecord::RecordInvalid => error
+      [ :unprocessable_content, { errors: error.record.errors.full_messages } ]
+    end
+
+    def execute_reversal
+      reversal = MoneyMovement::Reversal.call(transfer: Transfer.find(params[:id]))
+
+      [
+        :created,
+        reversal.as_json(only: %i[id source_account_id destination_account_id amount_cents currency status reversal_of_transfer_id])
+      ]
+    rescue ActiveRecord::RecordNotFound
+      [ :not_found, { errors: [ "Transfer not found" ] } ]
+    rescue MoneyMovement::Reversal::InvalidTransfer,
+      MoneyMovement::Reversal::AlreadyReversed,
+      MoneyMovement::Reversal::InsufficientFunds => error
       [ :unprocessable_content, { errors: [ error.message ] } ]
     rescue ActiveRecord::RecordInvalid => error
       [ :unprocessable_content, { errors: error.record.errors.full_messages } ]
