@@ -144,6 +144,42 @@ ALTER SEQUENCE public.ledger_entries_id_seq OWNED BY public.ledger_entries.id;
 
 
 --
+-- Name: reconciliation_checks; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.reconciliation_checks (
+    id bigint NOT NULL,
+    account_id bigint NOT NULL,
+    stored_balance_cents bigint NOT NULL,
+    ledger_balance_cents bigint NOT NULL,
+    difference_cents bigint NOT NULL,
+    status character varying NOT NULL,
+    checked_at timestamp(6) without time zone NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: reconciliation_checks_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.reconciliation_checks_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: reconciliation_checks_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.reconciliation_checks_id_seq OWNED BY public.reconciliation_checks.id;
+
+
+--
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -213,6 +249,13 @@ ALTER TABLE ONLY public.ledger_entries ALTER COLUMN id SET DEFAULT nextval('publ
 
 
 --
+-- Name: reconciliation_checks id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.reconciliation_checks ALTER COLUMN id SET DEFAULT nextval('public.reconciliation_checks_id_seq'::regclass);
+
+
+--
 -- Name: transfers id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -249,6 +292,14 @@ ALTER TABLE ONLY public.idempotency_keys
 
 ALTER TABLE ONLY public.ledger_entries
     ADD CONSTRAINT ledger_entries_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: reconciliation_checks reconciliation_checks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.reconciliation_checks
+    ADD CONSTRAINT reconciliation_checks_pkey PRIMARY KEY (id);
 
 
 --
@@ -310,6 +361,27 @@ CREATE INDEX index_ledger_entries_on_transfer_id ON public.ledger_entries USING 
 
 
 --
+-- Name: index_reconciliation_checks_on_account_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_reconciliation_checks_on_account_id ON public.reconciliation_checks USING btree (account_id);
+
+
+--
+-- Name: index_reconciliation_checks_on_account_id_and_checked_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_reconciliation_checks_on_account_id_and_checked_at ON public.reconciliation_checks USING btree (account_id, checked_at);
+
+
+--
+-- Name: index_reconciliation_checks_on_checked_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_reconciliation_checks_on_checked_at ON public.reconciliation_checks USING btree (checked_at);
+
+
+--
 -- Name: index_transfers_on_destination_account_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -343,6 +415,14 @@ CREATE TRIGGER ledger_entries_append_only BEFORE DELETE OR UPDATE ON public.ledg
 
 ALTER TABLE ONLY public.transfers
     ADD CONSTRAINT fk_rails_6461e65f5f FOREIGN KEY (reversal_of_transfer_id) REFERENCES public.transfers(id);
+
+
+--
+-- Name: reconciliation_checks fk_rails_8201e7b5cf; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.reconciliation_checks
+    ADD CONSTRAINT fk_rails_8201e7b5cf FOREIGN KEY (account_id) REFERENCES public.accounts(id);
 
 
 --
@@ -384,6 +464,7 @@ ALTER TABLE ONLY public.ledger_entries
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261027230000'),
 ('20261026214800'),
 ('20261021160000'),
 ('20261015230500'),
