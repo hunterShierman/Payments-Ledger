@@ -6,6 +6,8 @@ Rails.application.routes.draw do
     resources :accounts, only: :create do
       post :deposits, on: :member
       get :balance, on: :member
+      get :ledger_entries, on: :member, path: "ledger-entries"
+      get :transfers, on: :member
     end
   end
 

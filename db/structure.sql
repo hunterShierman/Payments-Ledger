@@ -367,6 +367,13 @@ ALTER TABLE ONLY public.transfers
 
 
 --
+-- Name: idx_on_destination_account_id_created_at_id_793168b252; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_on_destination_account_id_created_at_id_793168b252 ON public.transfers USING btree (destination_account_id, created_at, id);
+
+
+--
 -- Name: idx_on_source_account_id_destination_account_id_28e4e82bad; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -406,6 +413,13 @@ CREATE INDEX index_ledger_entries_on_account_id ON public.ledger_entries USING b
 --
 
 CREATE INDEX index_ledger_entries_on_account_id_and_created_at ON public.ledger_entries USING btree (account_id, created_at);
+
+
+--
+-- Name: index_ledger_entries_on_account_id_and_created_at_and_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_ledger_entries_on_account_id_and_created_at_and_id ON public.ledger_entries USING btree (account_id, created_at, id);
 
 
 --
@@ -455,6 +469,13 @@ CREATE UNIQUE INDEX index_transfers_on_reversal_of_transfer_id ON public.transfe
 --
 
 CREATE INDEX index_transfers_on_source_account_id ON public.transfers USING btree (source_account_id);
+
+
+--
+-- Name: index_transfers_on_source_account_id_and_created_at_and_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_transfers_on_source_account_id_and_created_at_and_id ON public.transfers USING btree (source_account_id, created_at, id);
 
 
 --
@@ -519,6 +540,7 @@ ALTER TABLE ONLY public.ledger_entries
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261028221000'),
 ('20261028220000'),
 ('20261027230000'),
 ('20261026214800'),

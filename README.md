@@ -174,6 +174,8 @@ The following endpoints are currently implemented:
 - `POST /v1/accounts`
 - `POST /v1/accounts/:id/deposits`
 - `GET /v1/accounts/:id/balance`
+- `GET /v1/accounts/:id/ledger-entries`
+- `GET /v1/accounts/:id/transfers`
 - `POST /v1/transfers`
 - `POST /v1/transfers/:id/reversal`
 
@@ -289,15 +291,22 @@ GET /v1/transfers/1
 Authorization: Bearer <api-key>
 ```
 
-### Planned: list ledger entries
+### List ledger entries and transfers
 
 ```http
 GET /v1/accounts/1/ledger-entries?limit=50&cursor=<cursor>
 Authorization: Bearer <api-key>
 ```
 
-List endpoints will use cursor-based pagination. The final pagination envelope
-will be documented once the ordering and cursor format are implemented.
+The transfers endpoint uses the same `limit` and `cursor` parameters: ```http
+GET /v1/accounts/1/transfers?limit=50&cursor=<cursor>
+Authorization: ******
+```
+
+Both endpoints return records in ascending `(created_at, id)` order. The
+compound ordering makes records with the same timestamp deterministic, while
+the opaque cursor prevents duplicates across pages. `limit` defaults to 50 and
+is capped at 100. Invalid cursors and limits return `400 Bad Request`.
 
 ## Key design decisions
 

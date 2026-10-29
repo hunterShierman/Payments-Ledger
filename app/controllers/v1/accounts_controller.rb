@@ -56,6 +56,41 @@ module V1
       render json: { errors: [ "Account not found" ] }, status: :not_found
     end
 
+    # Lists an account's ledger entries in stable cursor order.
+    def ledger_entries
+      account = Account.find(params[:id])
+      entries, next_cursor = paginate_relation(account.ledger_entries)
+
+      render json: {
+        data: entries.as_json(only: %i[id transfer_id amount_cents currency entry_type created_at]),
+        pagination: { next_cursor:, has_more: next_cursor.present? }
+      }
+    rescue ActiveRecord::RecordNotFound
+      render json: { errors: [ "Account not found" ] }, status: :not_found
+    rescue CursorPagination::InvalidCursorPagination => error
+      render json: { errors: [ error.message ] }, status: :bad_request
+    end
+
+    # Lists transfers where the account is either the source or destination.
+    def transfers
+      account = Account.find(params[:id])
+      relation = Transfer.where(source_account_id: account.id).or(
+        Transfer.where(destination_account_id: account.id)
+      )
+      transfers, next_cursor = paginate_relation(relation)
+
+      render json: {
+        data: transfers.as_json(
+          only: %i[id source_account_id destination_account_id amount_cents currency status created_at]
+        ),
+        pagination: { next_cursor:, has_more: next_cursor.present? }
+      }
+    rescue ActiveRecord::RecordNotFound
+      render json: { errors: [ "Account not found" ] }, status: :not_found
+    rescue CursorPagination::InvalidCursorPagination => error
+      render json: { errors: [ error.message ] }, status: :bad_request
+    end
+
     private
 
     # Permits the currency field accepted by account creation.
