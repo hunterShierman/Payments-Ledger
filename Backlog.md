@@ -42,7 +42,7 @@ Sizes: **S** = under 1 hr, **M** = 1 to 3 hrs, **L** = 3+ hrs. Work top to botto
 - **PL-26 (L) — Done** Reconciliation job that recomputes every materialized balance from entries and records drift. *Done when:* a spec corrupts `balance_cents` and the job records `account_id`, stored balance, ledger balance, difference, check time, and drift status without silently repairing the value.
 - **PL-27 (M) — Done** Background job runner using ActiveJob with Solid Queue or another Rails-native runner. *Done when:* reconciliation runs on a local schedule without Redis.
 - **PL-28 (M) - Done** API key authentication. *Done when:* requests without a valid key get 401, keys are stored hashed.
-- **PL-29 (M)** Cursor pagination for entries and transfers (`GET /v1/accounts/:id/ledger-entries`). *Done when:* stable ordering, no duplicates across pages.
+- **PL-29 (M) - Done** Cursor pagination for entries and transfers (`GET /v1/accounts/:id/ledger-entries`). *Done when:* stable ordering, no duplicates across pages.
 - **PL-30 (M)** Audit log recording money-moving actions. *Done when:* every deposit, transfer, and reversal produces an audit row containing actor/API-key identifier, action, resource type and ID, request ID, amount and currency where applicable, result/status, and timestamp without storing raw API keys or secrets.
 
 ## Epic 5: Ship it

@@ -1,4 +1,5 @@
 class ApplicationController < ActionController::API
+  include CursorPagination
   before_action :authenticate_api_key!
 
   private
