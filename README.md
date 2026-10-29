@@ -22,12 +22,12 @@ The current implementation includes:
 - Database-enforced amount, account, and append-only ledger constraints
 - Idempotency-key replay and payload-conflict handling for transfers
 - Row locking and bounded retries for concurrent money movement
+- Hashed API-key authentication for the v1 API
 - Request, service, and PostgreSQL-backed concurrency specs
 
 The following items remain planned and are not currently exposed by the API:
 
 - Transfer reads and ledger-entry pagination
-- API-key authentication
 - Reconciliation jobs
 - Audit logging, structured metrics, and deployment
 
@@ -72,8 +72,8 @@ together. Reconciliation is scheduled daily at 2:00 AM and runs without Redis.
 
 The API-only Rails application validates requests and executes money-movement
 commands. PostgreSQL owns transactional state and enforces invariants. API-key
-authentication, reconciliation, and other operational components remain part of
-the target architecture.
+authentication, reconciliation, and other operational components are implemented
+incrementally.
 
 The diagrams describe the target architecture, including planned authentication,
 reconciliation, audit, and operational components.
@@ -148,6 +148,18 @@ application conventions.
 A unique index ensures that concurrent requests with the same key cannot create
 independent claims. Reusing a key with a different payload returns an error
 rather than silently changing the original operation.
+
+### `api_keys`
+
+- `id`
+- optional name
+- SHA-256 key digest
+- optional revocation timestamp
+- timestamps
+
+The raw API key is returned only by `ApiKey.issue!` and is never stored. Clients
+must send it in the `X-API-Key` header for every `/v1` request. Missing, invalid,
+or revoked keys receive `401 Unauthorized`.
 
 ### Database integrity
 
