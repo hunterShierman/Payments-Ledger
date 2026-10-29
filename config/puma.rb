@@ -35,6 +35,7 @@ port ENV.fetch("PORT", 3000)
 plugin :tmp_restart
 
 # Run the Solid Queue supervisor inside of Puma for single-server deployments.
+# Set SOLID_QUEUE_IN_PUMA=1 locally to run scheduled jobs without Redis.
 plugin :solid_queue if ENV["SOLID_QUEUE_IN_PUMA"]
 
 # Specify the PID file. Defaults to tmp/pids/server.pid in development.
