@@ -13,7 +13,7 @@ credit entries, so the ledger always sums to zero.
 This is a personal project and is not connected to any employer or production
 payment system.
 
-## Current status
+## Implemented
 
 The current implementation includes:
 
@@ -22,34 +22,32 @@ The current implementation includes:
 - Database-enforced amount, account, and append-only ledger constraints
 - Idempotency-key replay and payload-conflict handling for transfers
 - Row locking and bounded retries for concurrent money movement
+- Immutable transfer reversals represented by compensating entries
+- Reconciliation drift checks through Solid Queue
 - Hashed API-key authentication for the v1 API
-- Request, service, and PostgreSQL-backed concurrency specs
+- Cursor pagination for account ledger entries and transfers
+- Request, service, database, and PostgreSQL-backed concurrency specs
+- GitHub Actions checks for RSpec, RuboCop, Brakeman, and Bundler Audit
 
-The following items remain planned and are not currently exposed by the API:
+## Deferred
 
-- Transfer reads and ledger-entry pagination
-- Reconciliation jobs
-- Audit logging, structured metrics, and deployment
+- Transfer reads by ID
+- Audit logging
+- Structured JSON logging and metrics
+- Authorization and account/tenant ownership
+- Load testing and published performance results
+- Production deployment
+- Webhooks, holds, and authorizations
 
-## Scope
+## Project boundary
 
-The target service will support:
-
-- Account creation, deposits, and balance reads
-- Double-entry transfers between accounts
-- Integer-cent money amounts with an explicit currency
-- Insufficient-funds rejection
-- Database-enforced integrity constraints
-- Safe retries through idempotency keys
-- Concurrency control for withdrawals and transfers
-- Append-only ledger entries and reversal entries
-- Reconciliation of account balances against ledger entries
-- API-key authentication, pagination, and audit logging
-- Structured logs and basic metrics
-- Reproducible concurrency and load tests
-
-The README describes both the current implementation and the intended design.
-The target design may change as the project is built and measured.
+Payments Ledger is an educational, correctness-focused prototype rather than
+production payment infrastructure. It demonstrates transactional money
+movement, double-entry accounting, safe request retries, database-enforced
+invariants, and concurrency control. Production hardening would still require
+authorization boundaries, rate limiting, stronger idempotency claim recovery,
+consistent reconciliation snapshots, operational observability, deployment
+controls, and incident-recovery procedures.
 
 ## Local checks
 
@@ -72,11 +70,11 @@ together. Reconciliation is scheduled daily at 2:00 AM and runs without Redis.
 
 The API-only Rails application validates requests and executes money-movement
 commands. PostgreSQL owns transactional state and enforces invariants. API-key
-authentication, reconciliation, and other operational components are implemented
-incrementally.
+authentication, reconciliation, and background processing are implemented with
+Rails and PostgreSQL-native components.
 
-The diagrams describe the target architecture, including planned authentication,
-reconciliation, audit, and operational components.
+The diagrams describe the current application boundary and the operational
+components that may be added later.
 
 ### C1: System context
 
@@ -103,9 +101,9 @@ continue to evolve during implementation:
 - timestamps
 
 `balance_cents` is an integer maintained transactionally with ledger writes. It
-is the read path for balances. A future reconciliation job will check it against
-the account's ledger total. The service does not use a cache in the initial
-implementation.
+is the read path for balances. The reconciliation job checks it against the
+account's ledger total and records drift without silently repairing the value.
+The service does not use a cache in the initial implementation.
 
 ### `transfers`
 
@@ -132,22 +130,21 @@ basis for idempotent retries.
 
 Each money movement creates one debit and one credit in the same database
 transaction. Deposits use a system funding account as the balancing side instead
-of creating unbalanced money. Ledger entries are append-only. A future reversal
-will create new entries instead of editing historical entries. Append-only
+of creating unbalanced money. Ledger entries are append-only. A reversal creates new entries instead of editing historical entries. Append-only
 behavior is enforced with a database trigger rather than relying only on
 application conventions.
 
 ### `idempotency_keys`
 
-- API key or account scope
 - idempotency key
 - request fingerprint
-- stored response or transfer reference
+- stored response
 - timestamps
 
 A unique index ensures that concurrent requests with the same key cannot create
 independent claims. Reusing a key with a different payload returns an error
-rather than silently changing the original operation.
+rather than silently changing the original operation. The prototype currently
+uses a global key namespace; API-key ownership and tenant scoping are deferred.
 
 ### `api_keys`
 
@@ -163,9 +160,10 @@ or revoked keys receive `401 Unauthorized`.
 
 ### Database integrity
 
-The schema will use foreign keys, `NOT NULL` constraints, check constraints, and
+The schema uses foreign keys, `NOT NULL` constraints, check constraints, and
 unique indexes for invariants that must hold regardless of which code path
-writes to the database.
+writes to the database. Application transactions additionally enforce the
+balanced transfer and materialized-balance rules.
 
 ## API
 
@@ -186,7 +184,7 @@ money-movement service.
 
 ```http
 POST /v1/accounts
-Authorization: Bearer <api-key>
+X-API-Key: <api-key>
 Content-Type: application/json
 
 {
@@ -206,7 +204,7 @@ Content-Type: application/json
 
 ```http
 POST /v1/accounts/1/deposits
-Authorization: Bearer <api-key>
+X-API-Key: <api-key>
 Content-Type: application/json
 
 {
@@ -231,7 +229,7 @@ account and the customer account.
 
 ```http
 GET /v1/accounts/1/balance
-Authorization: Bearer <api-key>
+X-API-Key: <api-key>
 ```
 
 ```json
@@ -246,7 +244,7 @@ Authorization: Bearer <api-key>
 
 ```http
 POST /v1/transfers
-Authorization: Bearer <api-key>
+X-API-Key: <api-key>
 Idempotency-Key: transfer-request-001
 Content-Type: application/json
 
@@ -277,6 +275,7 @@ Insufficient funds also returns a client error and creates no partial transfer.
 
 ```http
 POST /v1/transfers/1/reversal
+X-API-Key: <api-key>
 Idempotency-Key: reversal-request-001
 ```
 
@@ -284,23 +283,25 @@ Reversals create a new transfer with the source and destination swapped and
 append offsetting ledger entries. The original transfer and its ledger entries
 are never edited; a second reversal of the same transfer is rejected.
 
-### Planned: read a transfer
+### Deferred: read a transfer
 
 ```http
 GET /v1/transfers/1
-Authorization: Bearer <api-key>
+X-API-Key: <api-key>
 ```
 
 ### List ledger entries and transfers
 
 ```http
 GET /v1/accounts/1/ledger-entries?limit=50&cursor=<cursor>
-Authorization: Bearer <api-key>
+X-API-Key: <api-key>
 ```
 
-The transfers endpoint uses the same `limit` and `cursor` parameters: ```http
+The transfers endpoint uses the same `limit` and `cursor` parameters:
+
+```http
 GET /v1/accounts/1/transfers?limit=50&cursor=<cursor>
-Authorization: ******
+X-API-Key: <api-key>
 ```
 
 Both endpoints return records in ascending `(created_at, id)` order. The
@@ -312,14 +313,14 @@ is capped at 100. Invalid cursors and limits return `400 Bad Request`.
 
 ### Integer cents instead of floating point
 
-Money will be represented as integer minor units plus a currency code. This
+Money is represented as integer minor units plus a currency code. This
 avoids binary floating-point rounding and makes equality, constraints, and
 ledger balancing explicit. Amount validation will reject invalid or
 non-positive transfer amounts before the transaction is attempted.
 
 ### Row locks instead of serializable isolation
 
-Transfers will lock the affected account rows with `SELECT ... FOR UPDATE`,
+Transfers lock the affected account rows with `SELECT ... FOR UPDATE`,
 update them in a consistent order, and write both ledger entries in one
 transaction. This targets the specific records involved in a transfer and
 keeps contention more predictable than running every request at serializable
@@ -336,16 +337,16 @@ concurrent requests can both pass a pre-check before either commits.
 
 ### Materialized balances with reconciliation
 
-The service will store `accounts.balance_cents` as a materialized value and
-update it in the same transaction as the ledger entries. This keeps balance
+The service stores `accounts.balance_cents` as a materialized value and
+updates it in the same transaction as the ledger entries. This keeps balance
 reads inexpensive while PostgreSQL remains the source of truth. Reconciliation
-will compare the materialized balance with the sum of the account's append-only
-ledger entries and record drift without silently repairing it.
+compares the materialized balance with the sum of the account's append-only
+ledger entries and records drift without silently repairing it.
 
 ### Append-only history
 
-Historical ledger entries will not be edited to correct mistakes. Corrections
-will be represented by new entries, preserving an auditable sequence of events.
+Historical ledger entries are not edited to correct mistakes. Corrections are
+represented by new entries, preserving an auditable sequence of events.
 
 ## Testing strategy
 
@@ -360,7 +361,7 @@ Tests will cover both business behavior and database invariants:
 - Negative idempotency tests showing that a changed payload is rejected
 - Reversal tests proving that history is extended rather than edited
 - Reconciliation tests for matching balances and drift detection
-- Authentication and audit-log tests
+- Authentication tests
 
 ### Concurrency tests
 
@@ -384,10 +385,8 @@ request tests cannot prove.
 
 ## Code documentation convention
 
-Every method uses at least a concise purpose comment, including small private
-helpers and migration methods. Public domain services additionally use
-lightweight YARD-style comments for non-obvious side effects or invariants,
-parameters, return values, and domain-specific exceptions.
+Public domain services use concise comments for non-obvious side effects,
+invariants, parameters, return values, and domain-specific exceptions.
 
 ## Local development
 
@@ -407,44 +406,39 @@ bin/rails db:prepare
 bin/rails server
 ```
 
+Create a development API key and copy the printed value:
+
+```bash
+bin/rails runner 'key, raw = ApiKey.issue!(name: "local"); puts raw'
+```
+
+Send that value in the `X-API-Key` header when calling `/v1` endpoints.
+
 Run the test suite with RSpec:
 
 ```bash
 bundle exec rspec
 ```
 
-If Minitest is selected instead, the command and test organization will be
-updated here. Environment-specific configuration, API-key setup, and job-runner
-commands will be documented once implemented.
+Start the web server and local Solid Queue supervisor together with:
 
-## CI and deployment
+```bash
+SOLID_QUEUE_IN_PUMA=1 bin/dev
+```
 
-GitHub Actions will run the test suite against PostgreSQL and enforce the
-project's formatting and static checks. CI will include database setup so
-constraint and concurrency tests run against the same database engine used in
-development.
+## CI
 
-The service is planned for deployment on Fly.io or Render. Deployment details
-will be added after a hosting target is selected. Production credentials and
-API keys will be supplied through the platform's secret management, not checked
-into the repository.
+GitHub Actions runs the test suite against PostgreSQL and enforces formatting
+and security checks. Database setup happens in CI so constraint and concurrency
+tests run against the same database engine used in development.
 
-## Performance results
+## Limitations and future scale considerations
 
-Benchmark results will be recorded after the transfer path and load-test
-environment are stable.
-
-| Scenario | Throughput | p95 latency | Notes |
-| --- | ---: | ---: | --- |
-| Transfer creation | [X] req/s | [Y] ms | PostgreSQL-backed, no cache in the write path |
-| Balance reads | [X] req/s | [Y] ms | Materialized PostgreSQL balance |
-| Reconciliation | [X] accounts/s | [Y] ms | Record dataset size |
-
-Load tests will use k6. Results will include the workload, concurrency, database
-configuration, and deployment size. No benchmark number is claimed until it is
-measured.
-
-## Limitations and scale considerations
+This prototype intentionally uses a global API-key namespace and does not
+implement account-level authorization. It also does not yet provide production
+operational controls such as rate limiting, structured logs, metrics, audit
+logging, or deployment automation. These are deliberate scope boundaries rather
+than claims that the service is ready for production payment traffic.
 
 The initial design intentionally keeps PostgreSQL as the source of truth and
 uses row-level locking. At larger scale, I would evaluate:
@@ -453,8 +447,8 @@ uses row-level locking. At larger scale, I would evaluate:
 - Partitioning or sharding strategies for ledger and audit data
 - Read replicas for carefully selected read workloads
 - A dedicated reconciliation pipeline with incremental checkpoints
-- Stronger operational controls for key rotation, rate limiting, and incident
-  recovery
+- Stronger operational controls for key rotation, authorization, rate limiting,
+  and incident recovery
 - Online schema migrations and retention policies for large append-only tables
 - Explicit multi-region consistency requirements before introducing regional
   writes
@@ -466,3 +460,5 @@ same accounting invariants rather than bypassing them for throughput.
 
 - Webhooks for transfer events with signed payloads and retries
 - Holds and authorizations
+- Audit logging and structured operational telemetry
+- Production deployment and measured load testing
