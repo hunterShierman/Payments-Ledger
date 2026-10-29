@@ -62,6 +62,12 @@ Bundler Audit, and Brakeman before allowing a commit. To intentionally bypass
 the checks for one commit, use Git's standard `--no-verify` option or set
 `SKIP_PRE_COMMIT=1`.
 
+### Local background jobs
+
+Development uses Solid Queue with a local PostgreSQL queue database. Run
+`SOLID_QUEUE_IN_PUMA=1 bin/dev` to start the web server and queue supervisor
+together. Reconciliation is scheduled daily at 2:00 AM and runs without Redis.
+
 ## Architecture
 
 The API-only Rails application validates requests and executes money-movement
