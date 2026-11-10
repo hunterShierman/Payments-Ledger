@@ -82,6 +82,7 @@ module MoneyMovement
 
     def validate!
       raise InvalidTransfer, "Transfer not found" unless @transfer.is_a?(::Transfer) && @transfer.persisted?
+      raise InvalidTransfer, "Reversals cannot be reversed" if @transfer.reversal_of_transfer_id.present?
     end
   end
 end

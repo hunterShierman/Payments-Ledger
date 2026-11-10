@@ -3,6 +3,7 @@ module MoneyMovement
   class Deposit
     InvalidAmount = Transfer::InvalidAmount
     CurrencyMismatch = Transfer::CurrencyMismatch
+    class SystemAccount < StandardError; end
 
     # Deposits a positive amount and returns the resulting funding transfer.
     #
@@ -49,6 +50,7 @@ module MoneyMovement
     # Rejects non-positive amounts and currencies that differ from the account.
     def validate!
       raise InvalidAmount, "Amount must be greater than 0" unless @amount_cents.is_a?(Integer) && @amount_cents.positive?
+      raise SystemAccount, "Deposits cannot target a system account" if @account.system?
       raise CurrencyMismatch, "Currency does not match account" unless @account.currency == @currency
     end
   end

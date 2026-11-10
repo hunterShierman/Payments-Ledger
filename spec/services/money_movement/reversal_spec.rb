@@ -38,6 +38,15 @@ RSpec.describe MoneyMovement::Reversal do
       )
     end
 
+    it "rejects reversing a reversal" do
+      reversal = described_class.call(transfer:)
+
+      expect { described_class.call(transfer: reversal) }.to raise_error(
+        described_class::InvalidTransfer,
+        "Reversals cannot be reversed"
+      )
+    end
+
     it "rolls back when a reversal entry write fails" do
       entry_writes = 0
       allow(LedgerEntry).to receive(:create!).and_wrap_original do |original, *args|

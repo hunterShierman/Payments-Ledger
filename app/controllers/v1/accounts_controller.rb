@@ -35,7 +35,9 @@ module V1
       }, status: :created
     rescue ActiveRecord::RecordNotFound
       render json: { errors: [ "Account not found" ] }, status: :not_found
-    rescue MoneyMovement::Deposit::InvalidAmount, MoneyMovement::Deposit::CurrencyMismatch => error
+    rescue MoneyMovement::Deposit::InvalidAmount,
+      MoneyMovement::Deposit::CurrencyMismatch,
+      MoneyMovement::Deposit::SystemAccount => error
       render json: { errors: [ error.message ] }, status: :unprocessable_content
     rescue ActiveRecord::RecordInvalid => error
       render json: { errors: error.record.errors.full_messages }, status: :unprocessable_content

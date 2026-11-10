@@ -46,6 +46,22 @@ RSpec.describe "Deposits API", type: :request do
       expect(LedgerEntry.count).to eq(0)
     end
 
+    it "rejects deposits to a system account without writing anything" do
+      system_account = Account.create!(currency: "CAD", system: true)
+
+      post "/v1/accounts/#{system_account.id}/deposits",
+        params: { deposit: { amount_cents: 100, currency: "CAD" } },
+        headers: api_headers
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body).to eq(
+        "errors" => [ "Deposits cannot target a system account" ]
+      )
+      expect(Transfer.count).to eq(0)
+      expect(LedgerEntry.count).to eq(0)
+      expect(system_account.reload.balance_cents).to eq(0)
+    end
+
     it "does not allow an unknown account to receive a deposit" do
       post "/v1/accounts/0/deposits",
         params: { deposit: { amount_cents: 100, currency: "CAD" } },

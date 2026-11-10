@@ -168,6 +168,19 @@ RSpec.describe "Transfers API", type: :request do
         expect(response.parsed_body).to eq("errors" => [ "Transfer has already been reversed" ])
       end
 
+      it "rejects reversing a reversal" do
+        post "/v1/transfers/#{transfer.id}/reversal",
+          headers: api_headers.merge("Idempotency-Key" => "reversal-4")
+        reversal = Transfer.find_by!(reversal_of_transfer: transfer)
+
+        post "/v1/transfers/#{reversal.id}/reversal",
+          headers: api_headers.merge("Idempotency-Key" => "reversal-5")
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.parsed_body).to eq("errors" => [ "Reversals cannot be reversed" ])
+        expect(Transfer.count).to eq(2)
+      end
+
       it "requires an idempotency key" do
         post "/v1/transfers/#{transfer.id}/reversal", headers: api_headers
 
