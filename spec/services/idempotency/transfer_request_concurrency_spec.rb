@@ -1,7 +1,9 @@
 require "rails_helper"
 require "timeout"
 
-RSpec.describe Idempotency::TransferRequest, :concurrency, use_transactional_fixtures: false do
+RSpec.describe Idempotency::TransferRequest, :concurrency do
+  uses_transaction "creates one transfer when requests with the same key run concurrently"
+
   before do
     clean_database
   end

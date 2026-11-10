@@ -1,7 +1,13 @@
 require "rails_helper"
 require "timeout"
 
-RSpec.describe MoneyMovement::Transfer, :concurrency, use_transactional_fixtures: false do
+RSpec.describe MoneyMovement::Transfer, :concurrency do
+  uses_transaction(
+    "allows only one concurrent withdrawal when both requests see the same balance",
+    "completes simultaneous transfers in opposite directions without deadlock",
+    "never overdraws an account across 100 concurrent withdrawals"
+  )
+
   before do
     clean_database
   end
