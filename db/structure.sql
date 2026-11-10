@@ -119,7 +119,7 @@ CREATE TABLE public.idempotency_keys (
     response_body jsonb,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT idempotency_keys_status_allowed CHECK (((status)::text = ANY (ARRAY[('in_progress'::character varying)::text, ('completed'::character varying)::text, ('failed'::character varying)::text])))
+    CONSTRAINT idempotency_keys_status_allowed CHECK (((status)::text = ANY ((ARRAY['in_progress'::character varying, 'completed'::character varying, 'failed'::character varying])::text[])))
 );
 
 
@@ -194,7 +194,7 @@ CREATE TABLE public.reconciliation_checks (
     checked_at timestamp(6) without time zone NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT reconciliation_checks_status_allowed CHECK (((status)::text = ANY (ARRAY[('balanced'::character varying)::text, ('drifted'::character varying)::text])))
+    CONSTRAINT reconciliation_checks_status_allowed CHECK (((status)::text = ANY ((ARRAY['balanced'::character varying, 'drifted'::character varying])::text[])))
 );
 
 
@@ -244,7 +244,7 @@ CREATE TABLE public.transfers (
     CONSTRAINT transfers_amount_cents_positive CHECK ((amount_cents > 0)),
     CONSTRAINT transfers_currency_format CHECK (((currency)::text ~ '^[A-Z]{3}$'::text)),
     CONSTRAINT transfers_source_and_destination_different CHECK ((source_account_id <> destination_account_id)),
-    CONSTRAINT transfers_status_allowed CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('completed'::character varying)::text, ('reversed'::character varying)::text])))
+    CONSTRAINT transfers_status_allowed CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'completed'::character varying, 'reversed'::character varying])::text[])))
 );
 
 
