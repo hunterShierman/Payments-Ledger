@@ -26,7 +26,7 @@ RSpec.describe "ledger entries append-only trigger", type: :model do
         account_id, transfer_id, amount_cents, currency, entry_type,
         created_at, updated_at
       )
-      SELECT MIN(accounts.id), MAX(transfers.id), 100, 'USD', 'debit',
+      SELECT MIN(accounts.id), MAX(transfers.id), -100, 'USD', 'debit',
              CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
       FROM accounts, transfers
     SQL

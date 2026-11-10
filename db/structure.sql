@@ -37,7 +37,8 @@ CREATE TABLE public.accounts (
     balance_cents bigint DEFAULT 0 NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    system boolean DEFAULT false NOT NULL
+    system boolean DEFAULT false NOT NULL,
+    CONSTRAINT accounts_currency_format CHECK (((currency)::text ~ '^[A-Z]{3}$'::text))
 );
 
 
@@ -117,7 +118,8 @@ CREATE TABLE public.idempotency_keys (
     response_status integer,
     response_body jsonb,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT idempotency_keys_status_allowed CHECK (((status)::text = ANY (ARRAY[('in_progress'::character varying)::text, ('completed'::character varying)::text, ('failed'::character varying)::text])))
 );
 
 
@@ -153,7 +155,9 @@ CREATE TABLE public.ledger_entries (
     entry_type character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT ledger_entries_amount_cents_nonzero CHECK ((amount_cents <> 0))
+    CONSTRAINT ledger_entries_amount_cents_nonzero CHECK ((amount_cents <> 0)),
+    CONSTRAINT ledger_entries_currency_format CHECK (((currency)::text ~ '^[A-Z]{3}$'::text)),
+    CONSTRAINT ledger_entries_entry_type_sign CHECK (((((entry_type)::text = 'debit'::text) AND (amount_cents < 0)) OR (((entry_type)::text = 'credit'::text) AND (amount_cents > 0))))
 );
 
 
@@ -189,7 +193,8 @@ CREATE TABLE public.reconciliation_checks (
     status character varying NOT NULL,
     checked_at timestamp(6) without time zone NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT reconciliation_checks_status_allowed CHECK (((status)::text = ANY (ARRAY[('balanced'::character varying)::text, ('drifted'::character varying)::text])))
 );
 
 
@@ -237,7 +242,9 @@ CREATE TABLE public.transfers (
     updated_at timestamp(6) without time zone NOT NULL,
     reversal_of_transfer_id bigint,
     CONSTRAINT transfers_amount_cents_positive CHECK ((amount_cents > 0)),
-    CONSTRAINT transfers_source_and_destination_different CHECK ((source_account_id <> destination_account_id))
+    CONSTRAINT transfers_currency_format CHECK (((currency)::text ~ '^[A-Z]{3}$'::text)),
+    CONSTRAINT transfers_source_and_destination_different CHECK ((source_account_id <> destination_account_id)),
+    CONSTRAINT transfers_status_allowed CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('completed'::character varying)::text, ('reversed'::character varying)::text])))
 );
 
 
@@ -540,6 +547,7 @@ ALTER TABLE ONLY public.ledger_entries
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261110113000'),
 ('20261028221000'),
 ('20261028220000'),
 ('20261027230000'),
