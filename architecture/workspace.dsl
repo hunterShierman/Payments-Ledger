@@ -1,33 +1,26 @@
-workspace "Payments Ledger" "Target architecture views for the Payments Ledger service." {
+workspace "Payments Ledger" "Architecture views for the Payments Ledger service." {
 
     model {
         client = person "API client" "A client that creates accounts, deposits funds, reads balances, and submits transfers."
-        operator = person "Operator" "A maintainer who reviews audit logs, reconciliation results, metrics, and structured logs."
-        loadTester = softwareSystem "k6 load tests" "A k6 workload used to measure transfer throughput and balance-read latency." "External"
 
-        paymentsLedger = softwareSystem "Payments Ledger" "A double-entry payments ledger service that keeps balances correct under concurrent requests, makes retries safe, and preserves an auditable history."
+        paymentsLedger = softwareSystem "Payments Ledger" "A double-entry payments ledger service that keeps balances correct under concurrent requests, makes retries safe, and preserves transaction history."
 
         client -> paymentsLedger "Uses the REST API over HTTPS"
-        operator -> paymentsLedger "Reviews operational state and reconciliation results"
-        loadTester -> paymentsLedger "Generates authenticated API traffic over HTTPS"
 
-        api = container paymentsLedger "Rails API" "API-only Rails application for authentication, validation, money-movement commands, balance reads, pagination, audit logging, and structured request logging." "Ruby on Rails"
-        database = container paymentsLedger "PostgreSQL" "Transactional source of truth for accounts, materialized balances, transfers, append-only ledger entries, idempotency records, audit logs, and reconciliation results." "PostgreSQL"
-        jobs = container paymentsLedger "Reconciliation jobs" "Rails-native background jobs that recompute account balances from ledger entries and record drift." "ActiveJob + Solid Queue"
+        api = container paymentsLedger "Rails API" "API-only Rails application for authentication, request validation, money movement, balance reads, reversals, and cursor pagination." "Ruby on Rails"
+        ledgerDatabase = container paymentsLedger "Ledger PostgreSQL database" "Transactional source of truth for accounts, materialized balances, transfers, append-only ledger entries, idempotency records, API keys, and reconciliation results." "PostgreSQL"
+        queueDatabase = container paymentsLedger "Queue PostgreSQL database" "Stores Solid Queue job state and recurring reconciliation schedules." "PostgreSQL"
+        reconciliationWorker = container paymentsLedger "Reconciliation worker" "Runs scheduled Rails reconciliation jobs to compare materialized balances with append-only ledger totals and record drift." "ActiveJob + Solid Queue"
 
-        client -> api "Creates accounts, deposits funds, reads balances, submits transfers, and lists ledger entries"
-        operator -> api "Queries operational and audit endpoints"
-        loadTester -> api "Runs load-test scenarios"
-        api -> database "Reads and writes through transactional SQL"
-        jobs -> database "Reads ledger entries and records reconciliation results"
-        api -> jobs "Enqueues reconciliation work"
+        client -> api "Creates accounts, deposits funds, reads balances, submits transfers, reverses transfers, and lists account activity"
+        api -> ledgerDatabase "Reads and writes accounts and ledger state through transactional SQL"
+        reconciliationWorker -> ledgerDatabase "Reads balances and ledger entries and writes reconciliation checks"
+        reconciliationWorker -> queueDatabase "Claims and updates scheduled jobs"
     }
 
     views {
         systemContext paymentsLedger "C1_SystemContext" {
             include client
-            include operator
-            include loadTester
             include paymentsLedger
             autolayout lr
             description "C1: System context for the Payments Ledger service."
@@ -36,11 +29,10 @@ workspace "Payments Ledger" "Target architecture views for the Payments Ledger s
 
         container paymentsLedger "C2_Containers" {
             include client
-            include operator
-            include loadTester
             include api
-            include database
-            include jobs
+            include ledgerDatabase
+            include queueDatabase
+            include reconciliationWorker
             autolayout lr
             description "C2: Containers inside the Payments Ledger service."
             title "Payments Ledger - Containers"
