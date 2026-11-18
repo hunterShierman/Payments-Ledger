@@ -164,7 +164,7 @@ GEM
     minitest (6.1.0)
       drb (~> 2.0)
       prism (>= 1.5, < 3)
-    msgpack (1.8.5)
+    msgpack (1.8.7)
     net-imap (0.6.8)
       date
       net-protocol
@@ -212,7 +212,7 @@ GEM
       prettyprint
     prettyprint (0.2.1)
     prism (1.9.0)
-    puma (8.0.2)
+    puma (8.0.4)
       nio4r (~> 2.0)
     raabro (1.5.0)
     racc (1.8.1)
@@ -383,7 +383,7 @@ DEPENDENCIES
   image_processing (~> 1.2)
   kamal
   pg (~> 1.1)
-  puma (>= 5.0)
+  puma (~> 8.0.3)
   rails (~> 8.1.4)
   rspec-rails (~> 8.0)
   rubocop-rails-omakase
