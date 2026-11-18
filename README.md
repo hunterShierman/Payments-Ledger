@@ -13,12 +13,7 @@ simultaneously, only the valid withdrawal should succeed. The system must preven
 the account from becoming overdrawn and must produce one balanced transaction
 history.
 
-The hardest problem was concurrent withdrawals. Multiple requests could otherwise
-read the same balance and incorrectly approve transfers. PostgreSQL transactions,
-row locking, and database constraints now ensure that invalid or duplicate
-transfers are not committed.
-
-The project focuses on backend correctness rather than visual breadth. It uses
+This project is intentionally focused on backend correctness. It uses
 integer-cent amounts and double-entry accounting: every completed transfer
 creates one debit and one credit, so the ledger remains balanced.
 
@@ -55,29 +50,6 @@ The architecture is also maintained as Structurizr DSL in
 [`architecture/workspace.dsl`](architecture/workspace.dsl), including the C1
 system-context and C2 container views.
 
-## Key design decisions
-
-- Money is represented as integer cents instead of floating-point values.
-- Transfers lock affected account rows and update the balance and ledger entries
-  in one transaction.
-- Database-level idempotency keys prevent concurrent requests from creating
-  duplicate operations.
-- Materialized balances are reconciled against append-only ledger entries.
-- Corrections create new ledger entries instead of changing historical records.
-
-## Testing
-
-The test suite covers validation, authentication, atomic writes, constraints,
-idempotency, reversals, reconciliation, and real concurrent PostgreSQL requests.
-
-One concurrency test starts with a known balance and submits 100 withdrawals
-whose combined amount exceeds that balance. The service must keep the account
-from going negative, create only valid ledger entries, and preserve one
-consistent balance.
-
-See [development.md](development.md) for setup instructions, the data model,
-test strategy, CI details, and scale considerations.
-
 ## Limitations
 
 Payments Ledger intentionally does not implement account-level authorization,
@@ -89,4 +61,5 @@ Future work includes webhooks, holds and authorizations, audit logging,
 structured operational telemetry, and production deployment with measured load
 testing.
 
-For a more technical breakdown, see [development.md](development.md).
+For API endpoints, data models, testing, and implementation decisions, see
+[TECHNICAL_OVERVIEW.md](TECHNICAL_OVERVIEW.md).

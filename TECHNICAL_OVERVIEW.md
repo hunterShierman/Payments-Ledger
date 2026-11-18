@@ -1,52 +1,32 @@
 # Development
 
-This guide contains setup instructions and engineering details for Payments
-Ledger. The [README](README.md) provides the project overview and architecture.
+This guide contains technical engineering details for Payments Ledger. The
+[README](README.md) provides the project overview and architecture.
 
-## Local setup
+## API endpoints
 
-Prerequisites:
+The current API uses the `/v1` namespace and API-key authentication.
 
-- Ruby and Bundler
-- PostgreSQL
-- Node.js only if required by the selected Rails setup
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `POST` | `/v1/accounts` | Create an account |
+| `POST` | `/v1/accounts/:id/deposits` | Deposit funds into an account |
+| `GET` | `/v1/accounts/:id/balance` | Read an account balance |
+| `GET` | `/v1/accounts/:id/ledger-entries` | List an account's ledger entries |
+| `GET` | `/v1/accounts/:id/transfers` | List transfers involving an account |
+| `POST` | `/v1/transfers` | Create an account-to-account transfer |
+| `POST` | `/v1/transfers/:id/reversal` | Reverse a transfer |
+| `GET` | `/up` | Rails health check |
 
-Run:
+Authenticated `/v1` requests require an API key in the `X-API-Key` header.
+Transfer and reversal requests also require an `Idempotency-Key` header.
+Reusing an idempotency key with the same payload returns the stored result;
+reusing it with a different payload or while the original request is unresolved
+returns an error.
 
-```bash
-git clone <repository-url>
-cd Payments-Ledger
-bundle install
-bin/rails db:prepare
-bin/rails server
-```
-
-Create a development API key and copy the printed value:
-
-```bash
-bin/rails runner 'key, raw = ApiKey.issue!(name: "local"); puts raw'
-```
-
-Send that value in the `X-API-Key` header when calling `/v1` endpoints.
-
-The Git pre-commit hook runs `bin/ci`, which checks the test database, RSpec
-suite, RuboCop, Bundler Audit, and Brakeman before allowing a commit. To bypass
-it for one commit, use `git commit --no-verify` or set `SKIP_PRE_COMMIT=1`.
-
-Run the test suite with:
-
-```bash
-bundle exec rspec
-```
-
-Start the web server and local Solid Queue supervisor together with:
-
-```bash
-SOLID_QUEUE_IN_PUMA=1 bin/dev
-```
-
-Development uses Solid Queue with a local PostgreSQL queue database.
-Reconciliation is scheduled daily at 2:00 AM and runs without Redis.
+Ledger-entry and transfer list requests support cursor pagination. The API
+returns records in ascending `(created_at, id)` order and uses a cursor to
+prevent duplicates across pages.
 
 ## Data model
 
@@ -195,11 +175,6 @@ The concurrency suite runs real requests against PostgreSQL:
 These tests demonstrate guarantees that ordinary sequential request tests cannot
 prove.
 
-## Code documentation convention
-
-Public domain services use concise comments for non-obvious side effects,
-invariants, parameters, return values, and domain-specific exceptions.
-
 ## CI
 
 GitHub Actions runs the test suite against PostgreSQL and enforces formatting
@@ -212,6 +187,17 @@ The CI workflow runs:
 - RuboCop
 - Brakeman
 - Bundler Audit
+
+Testing and validation commands:
+
+```bash
+bundle exec rspec
+bin/rubocop
+bin/brakeman --no-pager
+bin/bundler-audit
+```
+
+Reconciliation runs daily at 2:00 AM through Solid Queue.
 
 ## Limitations and future scale considerations
 
