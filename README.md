@@ -2,9 +2,16 @@
 
 [![CI](https://github.com/hunterShierman/Payments-Ledger/actions/workflows/ci.yml/badge.svg)](https://github.com/hunterShierman/Payments-Ledger/actions/workflows/ci.yml)
 
+## Overview
+
 Payments Ledger is a backend service for moving money between accounts safely.
-It keeps account balances and a detailed transaction history consistent, even
-when requests arrive at the same time or the same transfer is submitted twice.
+Its goal is to prevent money from being created or lost when several requests
+arrive at once or the same transfer is submitted twice.
+
+For example, an account may start with $100. If two $80 withdrawals arrive
+simultaneously, only the valid withdrawal should succeed. The system must prevent
+the account from becoming overdrawn and must produce one balanced transaction
+history.
 
 The hardest problem was concurrent withdrawals. Multiple requests could otherwise
 read the same balance and incorrectly approve transfers. PostgreSQL transactions,
@@ -14,8 +21,6 @@ transfers are not committed.
 The project focuses on backend correctness rather than visual breadth. It uses
 integer-cent amounts and double-entry accounting: every completed transfer
 creates one debit and one credit, so the ledger remains balanced.
-
-This is a personal portfolio project, not a production payment system.
 
 ## Implemented
 
