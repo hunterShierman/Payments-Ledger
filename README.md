@@ -22,7 +22,7 @@ The project focuses on backend correctness rather than visual breadth. It uses
 integer-cent amounts and double-entry accounting: every completed transfer
 creates one debit and one credit, so the ledger remains balanced.
 
-## Implemented
+## Technical Details
 
 - Account creation, deposits, and balance reads
 - Double-entry transfers with integer-cent amounts
